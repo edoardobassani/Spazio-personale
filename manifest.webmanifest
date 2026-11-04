@@ -1,0 +1,19 @@
+{
+  "name": "Spazio personale",
+  "short_name": "Spazio",
+  "description": "Il tuo spazio personale per impegni, interessi e progetti.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f5f1",
+  "theme_color": "#183c34",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
