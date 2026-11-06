@@ -334,3 +334,21 @@ a { color: var(--green); }
 .toggle input { width: 22px; height: 22px; accent-color: var(--green); flex: none; }
 .toggle span { display: flex; flex-direction: column; }
 .toggle small { color: var(--muted); font-size: 13px; }
+
+/* Agenda: promemoria multipli, giorni, ripetizioni */
+.rem-list { display: flex; flex-direction: column; gap: 6px; }
+.rem-row { display: flex; align-items: center; gap: 6px; }
+.rem-row > select { flex: 1; min-width: 0; }
+.rem-row select, .rem-row input { border: 1px solid var(--line); background: var(--paper); border-radius: 12px; min-height: 46px; padding: 8px 10px; font-size: 16px; outline-color: var(--green); }
+.rem-custom { display: flex; gap: 6px; }
+.rem-custom input { width: 64px; }
+.add-rem { align-self: flex-start; margin-top: 2px; color: var(--green); }
+.wd-pick { display: flex; gap: 6px; }
+.wd-pick label { flex: 1; display: grid; place-items: center; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); font-weight: 700; color: var(--ink2); }
+.wd-pick label.on { background: var(--green); border-color: var(--green); color: var(--paper); }
+.wd-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.scope { display: flex; flex-direction: column; gap: 8px; background: var(--paper); border-radius: var(--r); padding: 14px; box-shadow: var(--shadow); }
+.scope p { margin: 0 0 4px; }
+.item.soon { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent), var(--shadow); }
+.soon-tag { font-style: normal; color: var(--accent); font-weight: 700; }
+.step-when { display: block; color: var(--green); font-size: 12.5px; font-weight: 600; text-decoration: none; }

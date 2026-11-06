@@ -1,9 +1,9 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.1.2';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.1.2';
-import { parseQuick } from './parse.js?v=2.1.2';
-import * as V from './views.js?v=2.1.2';
-import * as AI from './ai/assistant.js?v=2.1.2';
+import { load, onChange } from './store.js?v=2.2.0';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.2.0';
+import { parseQuick } from './parse.js?v=2.2.0';
+import * as V from './views.js?v=2.2.0';
+import * as AI from './ai/assistant.js?v=2.2.0';
 
 const ROUTES = {
   oggi: V.renderToday,
@@ -46,7 +46,7 @@ window.addEventListener('hashchange', () => {
 // Azioni attivate dai pulsanti con data-action
 const actions = {
   'open-settings': () => V.openSettings(),
-  'edit-event': el => V.openEventSheet(el.dataset.id),
+  'edit-event': el => V.openEventSheet(el.dataset.id, {}, [], el.dataset.date || ''),
   'new-event': () => V.openEventSheet(null, { date: V.newEventDate() }),
   'toggle-done': el => V.toggleDone(el.dataset.id, el.dataset.date),
   mode: el => { V.ui.mode = el.dataset.mode; render(); },

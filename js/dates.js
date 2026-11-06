@@ -41,6 +41,12 @@ export function inDays(iso) {
 
 // Restituisce le date (ISO) in cui un impegno cade nell'intervallo [from, to].
 export function occurrences(ev, from, to) {
+  const ex = ev.exdates && ev.exdates.length ? new Set(ev.exdates) : null;
+  const list = rawOccurrences(ev, from, to);
+  return ex ? list.filter(d => !ex.has(d)) : list;
+}
+
+function rawOccurrences(ev, from, to) {
   if (!ev.date) return [];
   const r = ev.recurrence || {};
   const freq = r.freq || 'none';
@@ -50,7 +56,22 @@ export function occurrences(ev, from, to) {
   const step = Math.max(1, parseInt(r.interval, 10) || 1);
   const out = [];
   let guard = 0;
-  if (freq === 'daily' || freq === 'weekly') {
+  if (freq === 'weekly' && r.days && r.days.length) {
+    // Più giorni nella settimana (es. lunedì, mercoledì e venerdì)
+    const span = 7 * step;
+    const ws = startOfWeekISO(ev.date);
+    const offs = r.days.map(d => (d + 6) % 7).sort((a, b) => a - b);
+    let k = ev.date < from ? Math.max(0, Math.floor(daysBetween(ws, from) / span) - 1) : 0;
+    while (guard++ < 5000) {
+      const w = addDaysISO(ws, k * span);
+      if (w > end) break;
+      for (const o of offs) {
+        const iso = addDaysISO(w, o);
+        if (iso >= ev.date && iso >= from && iso <= end) out.push(iso);
+      }
+      k++;
+    }
+  } else if (freq === 'daily' || freq === 'weekly') {
     const span = freq === 'daily' ? step : 7 * step;
     let k = ev.date < from ? Math.floor(daysBetween(ev.date, from) / span) : 0;
     let cur = addDaysISO(ev.date, k * span);

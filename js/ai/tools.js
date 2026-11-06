@@ -1,9 +1,9 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.1.2';
-import * as D from '../dates.js?v=2.1.2';
-import { items, TYPE, recLabel, leadLabel } from '../views.js?v=2.1.2';
+import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.2.0';
+import * as D from '../dates.js?v=2.2.0';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.2.0';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
@@ -23,7 +23,10 @@ const EVENT_PROPS = {
   repeat: S('Ripetizione', { enum: FREQS }),
   repeat_every: I('Ogni quanti giorni/settimane/mesi/anni, predefinito 1'),
   repeat_until: S('Ultima data della ripetizione AAAA-MM-GG, facoltativa'),
-  reminder_minutes: I("Anticipo del promemoria in minuti (60 = un'ora, 1440 = il giorno prima). Ometti per usare quello predefinito"),
+  repeat_days: { type: 'array', items: { type: 'string', enum: ['lunedi', 'martedi', 'mercoledi', 'giovedi', 'venerdi', 'sabato', 'domenica'] },
+    description: 'Solo per ripetizione settimanale su più giorni, es. ["lunedi","mercoledi","venerdi"]' },
+  reminders_minutes: { type: 'array', items: { type: 'integer' },
+    description: "Promemoria in minuti di anticipo, anche più di uno (60 = un'ora, 1440 = il giorno prima). Ometti per usare quello predefinito; [] per nessuno" },
 };
 
 const DEFS = [
@@ -92,14 +95,21 @@ function eventFromArgs(a, base = {}) {
   if (a.start != null) out.start = a.start || '';
   if (a.end != null) out.end = a.end || '';
   for (const k of ['location', 'category', 'notes']) if (a[k] != null) out[k] = String(a[k]);
-  if (a.repeat || a.repeat_every || a.repeat_until != null) {
-    const r = { ...(base.recurrence || { freq: 'none', interval: 1, until: '' }) };
+  if (a.repeat || a.repeat_every || a.repeat_until != null || a.repeat_days) {
+    const r = { ...(base.recurrence || { freq: 'none', interval: 1, until: '', days: [] }) };
     if (a.repeat) r.freq = a.repeat;
     if (a.repeat_every) r.interval = a.repeat_every;
     if (a.repeat_until != null) r.until = a.repeat_until || '';
+    if (Array.isArray(a.repeat_days)) {
+      const W = { domenica: 0, lunedi: 1, martedi: 2, mercoledi: 3, giovedi: 4, venerdi: 5, sabato: 6 };
+      r.days = a.repeat_days.map(x => W[String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')]).filter(x => x != null);
+      if (r.days.length) r.freq = 'weekly';
+    }
+    if (r.freq !== 'weekly') r.days = [];
     out.recurrence = r;
   }
-  if (a.reminder_minutes != null) out.reminder = Number(a.reminder_minutes);
+  if (Array.isArray(a.reminders_minutes)) out.reminders = a.reminders_minutes.map(Number).filter(n => Number.isFinite(n) && n >= 0);
+  else if (a.reminder_minutes != null) out.reminders = [Number(a.reminder_minutes)];
   return out;
 }
 
@@ -144,7 +154,8 @@ const EXEC = {
       inizio: it.ev.start || undefined, fine: it.ev.end || undefined,
       luogo: it.ev.location || undefined, categoria: it.ev.category || undefined,
       ripetizione: recLabel(it.ev.recurrence) || undefined,
-      promemoria: it.ev.reminder == null ? undefined : leadLabel(it.ev.reminder),
+      promemoria: it.ev.reminders.length ? remindersLabel(it.ev.reminders) : undefined,
+      progetto: it.ev.link ? (state.projects.find(p => p.id === it.ev.link.projectId) || {}).name : undefined,
       fatto: it.ev.type === 'appuntamento' ? undefined : it.done,
       note: perms.notes && it.ev.notes ? it.ev.notes : undefined,
     }));
@@ -155,11 +166,16 @@ const EXEC = {
     const e = eventFromArgs(a, { type: 'attivita' });
     const err = checkEvent(e);
     if (err) return { response: { errore: `Proposta non valida: ${err}` } };
-    if (e.reminder == null) e.reminder = state.settings.reminders[e.type] ?? null;
+    if (!e.reminders) e.reminders = state.settings.reminders[e.type] == null ? [] : [state.settings.reminders[e.type]];
+    // la prima data deve cadere in uno dei giorni scelti
+    if (e.recurrence && e.recurrence.days && e.recurrence.days.length) {
+      const first = D.occurrences(normEvent(e), e.date, D.addDaysISO(e.date, 7))[0];
+      if (first) e.date = first;
+    }
     const p = proposal('create_event', e, `Nuovo ${TYPE[e.type].label.toLowerCase()}`, [
       `«${e.title}»`, when(e.date, e.start, e.end), e.location && `Luogo: ${e.location}`,
       e.recurrence && e.recurrence.freq !== 'none' && recLabel(normEvent(e).recurrence),
-      `Promemoria: ${leadLabel(e.reminder)}`,
+      `Promemoria: ${remindersLabel(normEvent(e).reminders)}`,
     ]);
     return { proposal: p, response: { stato: "in attesa di conferma dell'utente", proposta: p.lines.join(' · ') } };
   },
@@ -178,8 +194,8 @@ const EXEC = {
     if (next.location !== ev.location) changes.push(`Luogo: ${next.location || 'nessuno'}`);
     if (next.notes !== ev.notes) changes.push('Note aggiornate');
     if (next.category !== ev.category) changes.push(`Categoria: ${next.category || 'nessuna'}`);
-    if (JSON.stringify(next.recurrence) !== JSON.stringify(ev.recurrence)) changes.push(`Ripetizione: ${recLabel(normEvent(next).recurrence) || 'nessuna'}`);
-    if (next.reminder !== ev.reminder) changes.push(`Promemoria: ${leadLabel(next.reminder)}`);
+    if (JSON.stringify(normEvent(next).recurrence) !== JSON.stringify(ev.recurrence)) changes.push(`Ripetizione: ${recLabel(normEvent(next).recurrence) || 'nessuna'}`);
+    if (JSON.stringify(normEvent(next).reminders) !== JSON.stringify(ev.reminders)) changes.push(`Promemoria: ${remindersLabel(normEvent(next).reminders)}`);
     if (!changes.length) return { response: { errore: 'Nessuna modifica rispetto a ora.' } };
     const p = proposal('update_event', { id: ev.id, data: next }, `Modifica «${ev.title}»`, changes);
     return { proposal: p, response: { stato: "in attesa di conferma dell'utente", proposta: changes.join(' · ') } };

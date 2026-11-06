@@ -1,7 +1,7 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.1.2';
-import * as D from './dates.js?v=2.1.2';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.1.2';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.2.0';
+import * as D from './dates.js?v=2.2.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.2.0';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -24,7 +24,16 @@ export function leadLabel(m) {
   if (m % 60 === 0) return `${m / 60} ore prima`;
   return `${m} minuti prima`;
 }
-export const recLabel = r => (!r || r.freq === 'none' ? '' : r.interval > 1 ? `Ogni ${r.interval} ${UNIT[r.freq][1]}` : FREQ[r.freq]);
+const WD_SHORT = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+export function recLabel(r) {
+  if (!r || r.freq === 'none') return '';
+  const base = r.interval > 1 ? `Ogni ${r.interval} ${UNIT[r.freq][1]}` : FREQ[r.freq];
+  if (r.freq === 'weekly' && r.days && r.days.length) {
+    return `${base}: ${[...r.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => WD_SHORT[d]).join(', ')}`;
+  }
+  return base;
+}
+export const remindersLabel = list => (list && list.length ? list.map(leadLabel).join(', ') : 'Nessun promemoria');
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // ---------- Dati calcolati
@@ -41,17 +50,33 @@ export function items(from, to) {
 // Senza orario, un impegno conta come "alle 9" per calcolare il promemoria
 const whenOf = it => D.at(it.date, it.ev.start || '09:00');
 
-// Promemoria il cui anticipo è già iniziato (impegni futuri, non svolti)
+// Stato dei promemoria di una ripetizione: null se nessuno è ancora scattato,
+// "soon" quando è scattato anche il più vicino (es. un'ora prima)
+export function reminderState(it, now = new Date()) {
+  const list = it.ev.reminders;
+  if (it.done || !list.length) return null;
+  const when = whenOf(it);
+  if (when < now && it.date !== D.todayISO()) return null;
+  const passed = list.filter(m => now >= new Date(when.getTime() - m * 60000));
+  if (!passed.length) return null;
+  const nearest = Math.min(...list);
+  return passed.includes(nearest) && (list.length > 1 || nearest <= 180) && when >= now ? 'soon' : 'on';
+}
+
+// Impegni futuri con almeno un promemoria già scattato
 export function activeReminders(horizonDays = 400) {
   const now = new Date();
   const t = D.todayISO();
-  return items(t, D.addDaysISO(t, horizonDays)).filter(it => {
-    if (it.done || it.ev.reminder == null) return false;
-    const when = whenOf(it);
-    if (when < now && it.date !== t) return false;
-    return now >= new Date(when.getTime() - it.ev.reminder * 60000);
-  });
+  return items(t, D.addDaysISO(t, horizonDays)).filter(it => reminderState(it, now));
 }
+
+const untilLabel = it => {
+  const mins = Math.round((whenOf(it) - new Date()) / 60000);
+  if (mins < 0) return '';
+  if (mins < 60) return `tra ${mins} min`;
+  if (mins < 24 * 60) return `tra ${Math.round(mins / 60)} h`;
+  return '';
+};
 
 function overdueDeadlines() {
   const t = D.todayISO();
@@ -100,18 +125,20 @@ export function quickAdd(placeholder = 'Es. dentista il 20 novembre alle 15') {
   </form>`;
 }
 
-function itemRow(it, { showDate = false, bell = false } = {}) {
+function itemRow(it, { showDate = false } = {}) {
   const e = it.ev;
+  const rs = reminderState(it);
+  const bell = !!rs;
   const canDone = e.type !== 'appuntamento';
   const time = e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : e.type === 'scadenza' ? 'Entro oggi' : 'In giornata';
-  const meta = [TYPE[e.type].label, e.location && `${icon('pin', 'xs')}${esc(e.location)}`, recLabel(e.recurrence) && icon('repeat', 'xs')]
+  const meta = [TYPE[e.type].label, e.location && `${icon('pin', 'xs')}${esc(e.location)}`, recLabel(e.recurrence) && icon('repeat', 'xs'), e.link && icon('layers', 'xs')]
     .filter(Boolean).join('<span class="sep">·</span>');
-  return `<div class="item ${TYPE[e.type].cls}${it.done ? ' is-done' : ''}">
+  return `<div class="item ${TYPE[e.type].cls}${it.done ? ' is-done' : ''}${rs === 'soon' ? ' soon' : ''}">
     ${canDone
       ? `<button class="check${it.done ? ' on' : ''}" data-action="toggle-done" data-id="${e.id}" data-date="${it.date}" aria-label="${it.done ? 'Segna come da fare' : 'Segna come fatto'}">${icon('check')}</button>`
       : '<span class="bar"></span>'}
-    <button class="item-main" data-action="edit-event" data-id="${e.id}">
-      <span class="item-time">${showDate ? `${D.relDay(it.date)} · ` : ''}${esc(time)}${bell ? ` ${icon('bell', 'xs accent')}` : ''}</span>
+    <button class="item-main" data-action="edit-event" data-id="${e.id}" data-date="${it.date}">
+      <span class="item-time">${showDate ? `${D.relDay(it.date)} · ` : ''}${esc(time)}${bell ? ` ${icon('bell', 'xs accent')}` : ''}${rs === 'soon' && untilLabel(it) ? ` <em class="soon-tag">${untilLabel(it)}</em>` : ''}</span>
       <strong>${esc(e.title)}</strong>
       <small>${meta}</small>
     </button>
@@ -130,7 +157,6 @@ export function renderToday() {
   const open = today.filter(i => !i.done);
   const week = items(D.addDaysISO(t, 1), D.addDaysISO(t, 7));
   const reminders = activeReminders();
-  const remIds = new Set(reminders.map(r => r.ev.id + r.date));
   const later = reminders.filter(r => r.date > D.addDaysISO(t, 7));
   const overdue = overdueDeadlines();
   const light = open.length <= 2 && h < 22;
@@ -149,9 +175,9 @@ export function renderToday() {
     ${overdue.length ? `<h2 class="sec warn">Scadenze passate</h2><div class="list">${overdue.map(i => itemRow(i, { showDate: true })).join('')}</div>` : ''}
     <h2 class="sec">Oggi</h2>
     <div class="list">${today.length ? today.map(i => itemRow(i)).join('') : empty('Giornata libera', 'Non hai niente in agenda per oggi.')}</div>
-    ${later.length ? `<h2 class="sec">Da ricordare</h2><div class="list">${later.map(i => itemRow(i, { showDate: true, bell: true })).join('')}</div>` : ''}
+    ${later.length ? `<h2 class="sec">Da ricordare</h2><div class="list">${later.map(i => itemRow(i, { showDate: true })).join('')}</div>` : ''}
     <h2 class="sec">Prossimi giorni</h2>
-    <div class="list">${week.length ? week.slice(0, 6).map(i => itemRow(i, { showDate: true, bell: remIds.has(i.ev.id + i.date) })).join('')
+    <div class="list">${week.length ? week.slice(0, 6).map(i => itemRow(i, { showDate: true })).join('')
       + (week.length > 6 ? `<a class="more" href="#impegni">Altri ${week.length - 6} nella settimana</a>` : '')
       : empty('Settimana tranquilla', 'Niente in programma per i prossimi sette giorni.')}</div>
     ${sugg.length ? `<h2 class="sec">Per il tempo libero</h2>
@@ -264,49 +290,148 @@ export function newEventDate() {
 
 // ---------- Pannello impegno
 
+const WD_PICK = [1, 2, 3, 4, 5, 6, 0]; // da lunedì a domenica
+const WD_LETTER = { 1: 'L', 2: 'M', 3: 'M', 4: 'G', 5: 'V', 6: 'S', 0: 'D' };
+const WD_NAME = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+
 function leadOptions(value) {
-  const known = LEADS.some(l => l[0] === (value == null ? '' : String(value)));
-  return LEADS.map(([v, l]) => `<option value="${v}"${(value == null ? '' : String(value)) === v ? ' selected' : ''}>${l}</option>`).join('')
+  const known = LEADS.some(l => l[0] !== '' && l[0] === String(value));
+  return LEADS.filter(l => l[0] !== '').map(([v, l]) => `<option value="${v}"${String(value) === v ? ' selected' : ''}>${l}</option>`).join('')
     + `<option value="custom"${!known ? ' selected' : ''}>Personalizzato…</option>`;
 }
+function splitLead(m) {
+  if (m % 1440 === 0 && m >= 1440) return ['1440', m / 1440];
+  if (m % 60 === 0 && m >= 60) return ['60', m / 60];
+  return ['1', m || 30];
+}
+function reminderRow(m) {
+  const known = LEADS.some(l => l[0] !== '' && l[0] === String(m));
+  const [u, n] = splitLead(m);
+  return `<div class="rem-row">
+    <select data-rem aria-label="Anticipo del promemoria">${leadOptions(m)}</select>
+    <span class="rem-custom"${known ? ' hidden' : ''}>
+      <input type="number" data-rem-n min="1" max="999" value="${n}" aria-label="Quanto prima">
+      <select data-rem-u aria-label="Unità"><option value="1"${u === '1' ? ' selected' : ''}>min</option><option value="60"${u === '60' ? ' selected' : ''}>ore</option><option value="1440"${u === '1440' ? ' selected' : ''}>giorni</option></select>
+    </span>
+    <button type="button" class="icon-btn tiny" data-rem-del aria-label="Togli promemoria">${icon('close')}</button>
+  </div>`;
+}
+function readReminders(root) {
+  return [...root.querySelectorAll('.rem-row')].map(row => {
+    const sel = row.querySelector('[data-rem]').value;
+    if (sel === 'custom') return Math.max(1, parseInt(row.querySelector('[data-rem-n]').value, 10) || 1) * +row.querySelector('[data-rem-u]').value;
+    return +sel;
+  });
+}
+const defaultReminders = type => (state.settings.reminders[type] == null ? [] : [state.settings.reminders[type]]);
 
-export function openEventSheet(id, preset = {}, notes = []) {
+// Chiede a cosa applicare la modifica di un impegno che si ripete
+function askScope(sheet, verb) {
+  return new Promise(resolve => {
+    const box = sheet.querySelector('.scope');
+    box.innerHTML = `<p><strong>${verb}</strong></p>
+      <button type="button" class="btn" data-scope="this">Solo questa volta</button>
+      <button type="button" class="btn" data-scope="future">Questa e le successive</button>
+      <button type="button" class="btn" data-scope="all">Tutte le ripetizioni</button>
+      <button type="button" class="btn ghost" data-scope="">Annulla</button>`;
+    box.hidden = false;
+    sheet.querySelector('.actions').hidden = true;
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    box.onclick = e => {
+      const b = e.target.closest('[data-scope]');
+      if (!b) return;
+      box.hidden = true; box.onclick = null;
+      sheet.querySelector('.actions').hidden = false;
+      resolve(b.dataset.scope || null);
+    };
+  });
+}
+
+const isFirstOccurrence = (ev, date) => D.occurrences({ ...ev, exdates: [] }, ev.date, date)[0] === date;
+
+// Applica le modifiche a una ripetizione, alle successive o a tutte
+function saveRecurring(ev, data, occ, scope) {
+  if (scope === 'future' && isFirstOccurrence(ev, occ)) scope = 'all';
+  if (scope === 'this') {
+    if (!ev.exdates.includes(occ)) ev.exdates.push(occ);
+    touch(ev);
+    const copy = normEvent({ ...data, id: uid(), recurrence: { freq: 'none' }, exdates: [],
+      done: ev.done.includes(occ) && data.date === occ ? [occ] : [] });
+    state.events.push(copy);
+    return 'Modificata solo questa volta';
+  }
+  if (scope === 'future') {
+    const shift = D.daysBetween(occ, data.date);
+    const next = normEvent({ ...data, id: uid(),
+      done: ev.done.filter(d => d >= occ).map(d => D.addDaysISO(d, shift)),
+      exdates: ev.exdates.filter(d => d >= occ).map(d => D.addDaysISO(d, shift)) });
+    ev.recurrence.until = D.addDaysISO(occ, -1);
+    ev.done = ev.done.filter(d => d < occ);
+    ev.exdates = ev.exdates.filter(d => d < occ);
+    touch(ev);
+    state.events.push(next);
+    return 'Modificate questa e le successive';
+  }
+  // Tutte: se hai spostato il giorno, sposto l'intera serie dello stesso numero di giorni
+  const shift = D.daysBetween(occ, data.date);
+  Object.assign(ev, normEvent({ ...data, id: ev.id, date: D.addDaysISO(ev.date, shift),
+    done: ev.done.map(d => D.addDaysISO(d, shift)), exdates: ev.exdates.map(d => D.addDaysISO(d, shift)) }));
+  touch(ev);
+  return 'Modificate tutte le ripetizioni';
+}
+
+function deleteRecurring(ev, occ, scope) {
+  if (scope === 'future' && isFirstOccurrence(ev, occ)) scope = 'all';
+  if (scope === 'this') { ev.exdates.push(occ); touch(ev); return 'Eliminata solo questa volta'; }
+  if (scope === 'future') {
+    ev.recurrence.until = D.addDaysISO(occ, -1);
+    ev.done = ev.done.filter(d => d < occ);
+    touch(ev);
+    return 'Eliminate questa e le successive';
+  }
+  state.events = state.events.filter(e => e.id !== ev.id);
+  return 'Impegno eliminato';
+}
+
+export function openEventSheet(id, preset = {}, notes = [], occDate = '') {
   const ev = id ? state.events.find(e => e.id === id) : null;
   if (id && !ev) { toast('Impegno non trovato'); return; }
-  const d = ev ? JSON.parse(JSON.stringify(ev)) : normEvent({ ...preset, reminder: undefined });
-  if (!ev) d.reminder = state.settings.reminders[d.type] ?? null;
+  const d = ev ? JSON.parse(JSON.stringify(ev)) : normEvent({ ...preset, reminders: preset.reminders || [] });
+  if (!ev && !preset.reminders) d.reminders = defaultReminders(d.type);
+  const recurring = ev && ev.recurrence.freq !== 'none';
+  const occ = recurring ? (occDate || ev.date) : '';
+  if (recurring) d.date = occ; // mostro la data della ripetizione toccata
   const r = d.recurrence;
-  const custom = d.reminder != null && !LEADS.some(l => l[0] === String(d.reminder));
-  const cu = custom ? (d.reminder % 1440 === 0 ? ['1440', d.reminder / 1440] : d.reminder % 60 === 0 ? ['60', d.reminder / 60] : ['1', d.reminder]) : ['1440', 1];
+  const days = r.days.length ? r.days : [D.parseISO(d.date).getDay()];
   const cats = [...new Set(state.events.map(e => e.category).filter(Boolean))];
+  const project = d.link && state.projects.find(p => p.id === d.link.projectId);
 
   openSheet(`
     <div class="sheet-head"><h2>${ev ? 'Modifica impegno' : 'Nuovo impegno'}</h2>
       <button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
     ${notes.length ? `<div class="notice">${icon('spark', 'xs')}<div><strong>Ho capito così: controlla e salva.</strong>${notes.filter(Boolean).map(n => `<p>${esc(n)}</p>`).join('')}</div></div>` : ''}
+    ${recurring ? `<p class="hint">${icon('repeat', 'xs')} ${esc(recLabel(r))} · stai guardando la volta di ${esc(D.fmt(occ, { weekday: 'long', day: 'numeric', month: 'long' }))}</p>` : ''}
+    ${project ? `<p class="hint">${icon('layers', 'xs')} Passaggio del progetto «${esc(project.name)}»: quando lo segni fatto, si spunta anche nel progetto.</p>` : ''}
     <form class="form" id="ev-form" novalidate>
       <div class="seg type-seg">
         ${Object.entries(TYPE).map(([k, v]) => `<label class="${d.type === k ? 'on' : ''}"><input type="radio" name="type" value="${k}"${d.type === k ? ' checked' : ''}>${v.label}</label>`).join('')}
       </div>
       <label class="field"><span>Titolo</span><input name="title" value="${esc(d.title === 'Senza titolo' && !ev ? '' : d.title)}" required maxlength="140" placeholder="Cosa devi fare?"></label>
-      <div class="row">
-        <label class="field"><span>Data</span><input type="date" name="date" value="${d.date}" required></label>
-      </div>
+      <label class="field"><span>Data</span><input type="date" name="date" value="${d.date}" required></label>
       <div class="row">
         <label class="field"><span>Inizio</span><input type="time" name="start" value="${d.start}"></label>
         <label class="field"><span>Fine</span><input type="time" name="end" value="${d.end}"></label>
       </div>
       <p class="hint">Lascia vuoti gli orari se non serve un'ora precisa.</p>
-      <label class="field"><span>Promemoria</span><select name="reminder">${leadOptions(d.reminder)}</select></label>
-      <div class="row custom-lead"${custom ? '' : ' hidden'}>
-        <label class="field"><span>Quanto prima</span><input type="number" name="leadN" min="1" max="999" value="${cu[1]}"></label>
-        <label class="field"><span>&nbsp;</span><select name="leadU">
-          <option value="1"${cu[0] === '1' ? ' selected' : ''}>minuti</option>
-          <option value="60"${cu[0] === '60' ? ' selected' : ''}>ore</option>
-          <option value="1440"${cu[0] === '1440' ? ' selected' : ''}>giorni</option></select></label>
+      <div class="field"><span>Promemoria</span>
+        <div class="rem-list">${d.reminders.map(reminderRow).join('')}</div>
+        <button type="button" class="btn small ghost add-rem" data-rem-add>${icon('bell', 'xs')} Aggiungi promemoria</button>
       </div>
       <label class="field"><span>Ripetizione</span><select name="freq">
         ${Object.entries(FREQ).map(([k, v]) => `<option value="${k}"${r.freq === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <div class="field wd-field"${r.freq === 'weekly' ? '' : ' hidden'}><span>Nei giorni</span>
+        <div class="wd-pick">${WD_PICK.map(n => `<label class="${days.includes(n) ? 'on' : ''}" title="${WD_NAME[n]}"><input type="checkbox" name="wd" value="${n}"${days.includes(n) ? ' checked' : ''}>${WD_LETTER[n]}</label>`).join('')}</div>
+      </div>
       <div class="row rec-extra"${r.freq === 'none' ? ' hidden' : ''}>
         <label class="field"><span>Ogni quanti</span><input type="number" name="interval" min="1" max="99" value="${r.interval}"></label>
         <label class="field"><span>Fino al (facoltativo)</span><input type="date" name="until" value="${r.until}"></label>
@@ -316,37 +441,66 @@ export function openEventSheet(id, preset = {}, notes = []) {
         <datalist id="cat-list">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label>
       <label class="field"><span>Note</span><textarea name="notes" rows="3" maxlength="2000">${esc(d.notes)}</textarea></label>
       <p class="error" hidden></p>
+      <div class="scope" hidden></div>
       <div class="actions">
         ${ev ? `<button type="button" class="btn ghost danger" data-del>Elimina</button>` : ''}
         <button class="btn primary">Salva</button>
       </div>
-      ${ev && r.freq !== 'none' ? '<p class="hint">Le modifiche valgono per tutte le ripetizioni di questo impegno.</p>' : ''}
     </form>`, sheet => {
     const f = sheet.querySelector('#ev-form');
-    let leadTouched = !!ev;
-    f.reminder.addEventListener('change', () => {
-      leadTouched = true;
-      sheet.querySelector('.custom-lead').hidden = f.reminder.value !== 'custom';
+    const remList = sheet.querySelector('.rem-list');
+    let remTouched = !!ev || !!preset.reminders;
+    const refreshAdd = () => { sheet.querySelector('[data-rem-add]').hidden = remList.children.length >= 5; };
+    refreshAdd();
+    sheet.querySelector('[data-rem-add]').addEventListener('click', () => {
+      remTouched = true;
+      const used = readReminders(remList);
+      const next = [1440, 60, 15, 180, 2880, 10080, 0].find(m => !used.includes(m)) ?? 60;
+      remList.insertAdjacentHTML('beforeend', reminderRow(next));
+      refreshAdd();
     });
-    f.freq.addEventListener('change', () => { sheet.querySelector('.rec-extra').hidden = f.freq.value === 'none'; });
+    remList.addEventListener('change', e => {
+      remTouched = true;
+      const sel = e.target.closest('[data-rem]');
+      if (sel) sel.parentNode.querySelector('.rem-custom').hidden = sel.value !== 'custom';
+    });
+    remList.addEventListener('click', e => {
+      const del = e.target.closest('[data-rem-del]');
+      if (del) { remTouched = true; del.closest('.rem-row').remove(); refreshAdd(); }
+    });
+    const showRec = () => {
+      sheet.querySelector('.rec-extra').hidden = f.freq.value === 'none';
+      sheet.querySelector('.wd-field').hidden = f.freq.value !== 'weekly';
+    };
+    f.freq.addEventListener('change', showRec);
+    sheet.querySelector('.wd-pick').addEventListener('change', () => {
+      sheet.querySelectorAll('.wd-pick label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+    });
     f.querySelectorAll('input[name=type]').forEach(inp => inp.addEventListener('change', () => {
       f.querySelectorAll('.type-seg label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
-      if (!leadTouched) {
-        const v = state.settings.reminders[inp.value];
-        f.reminder.innerHTML = leadOptions(v);
-        sheet.querySelector('.custom-lead').hidden = f.reminder.value !== 'custom';
-      }
+      if (!remTouched) { remList.innerHTML = defaultReminders(inp.value).map(reminderRow).join(''); refreshAdd(); }
     }));
     if (!ev && !preset.title) setTimeout(() => f.title.focus(), 50);
+
     const del = sheet.querySelector('[data-del]');
-    if (del) del.addEventListener('click', () => {
-      if (!confirm(`Eliminare «${ev.title}»${r.freq !== 'none' ? ' e tutte le sue ripetizioni' : ''}?`)) return;
-      state.events = state.events.filter(e => e.id !== ev.id);
-      closeSheet(); commit(); toast('Impegno eliminato');
+    if (del) del.addEventListener('click', async () => {
+      let msg;
+      if (recurring) {
+        const scope = await askScope(sheet, 'Cosa vuoi eliminare?');
+        if (!scope) return;
+        msg = deleteRecurring(ev, occ, scope);
+      } else {
+        if (!confirm(`Eliminare «${ev.title}»?`)) return;
+        state.events = state.events.filter(e => e.id !== ev.id);
+        msg = 'Impegno eliminato';
+      }
+      closeSheet(); commit(); toast(msg);
     });
-    f.addEventListener('submit', e => {
+
+    f.addEventListener('submit', async e => {
       e.preventDefault();
       const err = sheet.querySelector('.error');
+      err.hidden = true;
       const val = n => f[n].value.trim();
       const fail = msg => { err.textContent = msg; err.hidden = false; err.scrollIntoView({ block: 'center', behavior: 'smooth' }); };
       if (!val('title')) return fail('Scrivi un titolo.');
@@ -354,22 +508,36 @@ export function openEventSheet(id, preset = {}, notes = []) {
       if (val('start') && val('end') && val('end') <= val('start')) return fail("L'ora di fine deve essere dopo l'inizio.");
       if (val('end') && !val('start')) return fail("Se metti l'ora di fine, indica anche l'inizio.");
       if (f.freq.value !== 'none' && val('until') && val('until') < val('date')) return fail('La ripetizione deve finire dopo la data di inizio.');
-      let reminder = f.reminder.value === '' ? null : f.reminder.value === 'custom'
-        ? Math.max(1, parseInt(f.leadN.value, 10) || 1) * +f.leadU.value : +f.reminder.value;
+      let wd = [...f.querySelectorAll('input[name=wd]:checked')].map(x => +x.value);
+      if (f.freq.value === 'weekly' && !wd.length) return fail('Scegli almeno un giorno della settimana.');
+      // Un solo giorno uguale a quello della data: è la normale ripetizione settimanale
+      if (wd.length === 1 && wd[0] === D.parseISO(val('date')).getDay()) wd = [];
       const data = normEvent({
-        ...(ev || {}),
+        ...(ev || {}), ...(ev ? {} : { link: preset.link || null }),
         id: ev ? ev.id : uid(),
         type: f.querySelector('input[name=type]:checked').value,
         title: val('title'), date: val('date'), start: val('start'), end: val('end'),
         location: val('location'), category: val('category'), notes: f.notes.value.trim(),
-        recurrence: { freq: f.freq.value, interval: f.interval.value, until: f.freq.value === 'none' ? '' : val('until') },
-        reminder,
+        recurrence: { freq: f.freq.value, interval: f.interval.value, until: f.freq.value === 'none' ? '' : val('until'), days: f.freq.value === 'weekly' ? wd : [] },
+        reminders: readReminders(remList),
         done: ev ? ev.done : [],
       });
-      touch(data);
-      if (ev) Object.assign(ev, data); else state.events.push(data);
-      closeSheet(); commit();
-      toast(ev ? 'Impegno aggiornato' : `Aggiunto: ${D.relDay(data.date).toLowerCase()}${data.start ? ' alle ' + data.start : ''}`);
+      if (data.recurrence.freq === 'weekly' && data.recurrence.days.length && !data.recurrence.days.includes(D.parseISO(data.date).getDay()) && !recurring) {
+        // La data iniziale deve cadere in uno dei giorni scelti: sposto al primo giorno utile
+        const first = D.occurrences({ ...data, exdates: [] }, data.date, D.addDaysISO(data.date, 7))[0];
+        if (first) data.date = first;
+      }
+      let msg;
+      if (recurring) {
+        const scope = await askScope(sheet, 'A cosa applico la modifica?');
+        if (!scope) return;
+        msg = saveRecurring(ev, data, occ, scope);
+      } else {
+        touch(data);
+        if (ev) Object.assign(ev, data); else state.events.push(data);
+        msg = ev ? 'Impegno aggiornato' : `Aggiunto: ${D.relDay(data.date).toLowerCase()}${data.start ? ' alle ' + data.start : ''}`;
+      }
+      closeSheet(); commit(); toast(msg);
     });
   });
 }
@@ -378,11 +546,39 @@ export function toggleDone(id, date) {
   const ev = state.events.find(e => e.id === id);
   if (!ev) return;
   const i = ev.done.indexOf(date);
-  if (i >= 0) ev.done.splice(i, 1); else ev.done.push(date);
-  touch(ev); commit();
+  const nowDone = i < 0;
+  if (nowDone) ev.done.push(date); else ev.done.splice(i, 1);
+  touch(ev);
+  // Se è un passaggio di un progetto, lo spunto anche lì
+  let extra = '';
+  if (ev.link) {
+    const p = state.projects.find(x => x.id === ev.link.projectId);
+    const s = p && p.steps.find(x => x.id === ev.link.stepId);
+    if (s) {
+      s.done = nowDone;
+      p.lastActivityAt = new Date().toISOString();
+      touch(p);
+      if (nowDone) extra = ` · passaggio fatto in «${p.name}»`;
+    }
+  }
+  commit();
+  if (extra) toast('Fatto' + extra);
 }
 
 // ---------- PROGETTI
+
+// Se un passaggio è fissato in agenda, restituisce la prossima data
+function stepDate(stepId) {
+  const t = D.todayISO();
+  const evs = state.events.filter(e => e.link && e.link.stepId === stepId);
+  let best = '';
+  for (const e of evs) {
+    const next = D.occurrences(e, t, D.addDaysISO(t, 400))[0] || (e.recurrence.freq === 'none' ? e.date : '');
+    if (next && (!best || next < best)) best = next;
+  }
+  return best;
+}
+const stepDateLabel = iso => D.relDay(iso);
 
 function projectCard(p) {
   const total = p.steps.length, done = p.steps.filter(s => s.done).length;
@@ -397,7 +593,7 @@ function projectCard(p) {
     </button>
     ${next && p.status === 'attivo' ? `<div class="next-step">
       <button class="check" data-action="step-done" data-id="${p.id}" data-step="${next.id}" aria-label="Segna il passaggio come fatto">${icon('check')}</button>
-      <span><small>Prossimo passo</small>${esc(next.text)}</span></div>` : ''}
+      <span><small>Prossimo passo${stepDate(next.id) ? ` · ${icon('calendar', 'xs')} ${esc(stepDateLabel(stepDate(next.id)).toLowerCase())}` : ''}</small>${esc(next.text)}</span></div>` : ''}
   </div>`;
 }
 
@@ -424,7 +620,8 @@ export function openProjectSheet(id) {
   const steps = d.steps;
   const stepsHTML = () => steps.length ? steps.map(s => `<li class="${s.done ? 'is-done' : ''}">
       <button type="button" class="check${s.done ? ' on' : ''}" data-st-toggle="${s.id}" aria-label="Fatto">${icon('check')}</button>
-      <span>${esc(s.text)}</span>
+      <span>${esc(s.text)}${stepDate(s.id) ? `<small class="step-when">${icon('calendar', 'xs')} ${esc(stepDateLabel(stepDate(s.id)))}</small>` : ''}</span>
+      ${s.done ? '' : `<button type="button" class="icon-btn tiny" data-st-plan="${s.id}" aria-label="Fissa in agenda">${icon('calendar')}</button>`}
       <button type="button" class="icon-btn tiny" data-st-del="${s.id}" aria-label="Elimina passaggio">${icon('close')}</button></li>`).join('')
     : '<li class="muted">Nessun passaggio. Spezzare un progetto in piccoli passi aiuta a ripartire.</li>';
 
@@ -463,7 +660,16 @@ export function openProjectSheet(id) {
     sheet.querySelector('[data-st-add]').addEventListener('click', add);
     f.newStep.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
     list.addEventListener('click', e => {
-      const tg = e.target.closest('[data-st-toggle]'), dl = e.target.closest('[data-st-del]');
+      const tg = e.target.closest('[data-st-toggle]'), dl = e.target.closest('[data-st-del]'), pl = e.target.closest('[data-st-plan]');
+      if (pl) {
+        // Salvo il progetto e apro un nuovo impegno collegato al passaggio
+        const saved = save();
+        if (!saved) return;
+        commit();
+        const step = saved.steps.find(x => x.id === pl.dataset.stPlan);
+        openEventSheet(null, { title: step.text, type: 'attivita', date: D.todayISO(), link: { projectId: saved.id, stepId: step.id } });
+        return;
+      }
       if (tg) { const s = steps.find(x => x.id === tg.dataset.stToggle); s.done = !s.done; redraw(); }
       if (dl) { const i = steps.findIndex(x => x.id === dl.dataset.stDel); steps.splice(i, 1); redraw(); }
     });
@@ -474,17 +680,22 @@ export function openProjectSheet(id) {
       state.projects = state.projects.filter(x => x.id !== p.id);
       closeSheet(); commit(); toast('Progetto eliminato');
     });
-    f.addEventListener('submit', e => {
-      e.preventDefault();
+    let target = p;
+    function save() {
       if (f.newStep.value.trim()) add();
-      if (!f.name.value.trim()) { const er = sheet.querySelector('.error'); er.textContent = 'Dai un nome al progetto.'; er.hidden = false; return; }
+      if (!f.name.value.trim()) { const er = sheet.querySelector('.error'); er.textContent = 'Dai un nome al progetto.'; er.hidden = false; return null; }
       const data = normProject({
-        ...d, id: p ? p.id : uid(), name: f.name.value, goal: f.goal.value.trim(), description: f.description.value.trim(),
+        ...d, id: target ? target.id : d.id, name: f.name.value, goal: f.goal.value.trim(), description: f.description.value.trim(),
         status: f.status.value, deadline: f.deadline.value, notes: f.notes.value.trim(), steps,
         lastActivityAt: new Date().toISOString(), snoozedUntil: '',
       });
       touch(data);
-      if (p) Object.assign(p, data); else state.projects.push(data);
+      if (target) Object.assign(target, data); else { state.projects.push(data); target = data; }
+      return target;
+    }
+    f.addEventListener('submit', e => {
+      e.preventDefault();
+      if (!save()) return;
       closeSheet(); commit(); toast(p ? 'Progetto aggiornato' : 'Progetto creato');
     });
   });
@@ -626,7 +837,7 @@ export function openSettings() {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.1.2</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.2.0</p>`, sheet => {
     sheet.querySelectorAll('[data-lead]').forEach(el => el.addEventListener('change', () => {
       state.settings.reminders[el.dataset.lead] = el.value === '' ? null : +el.value;
       commit(); toast('Salvato');

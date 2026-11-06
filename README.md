@@ -1,4 +1,4 @@
-# Spazio personale — v2.1
+# Spazio personale — v2.2
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -15,15 +15,17 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 **Impegni**
 - Tre tipi: appuntamento, attività (si può spuntare), scadenza (si può spuntare).
 - Titolo, data, ora di inizio e fine, luogo, categoria, note.
-- Ripetizioni: ogni giorno, settimana, mese o anno, ogni N, con data di fine facoltativa.
-- Promemoria per impegno, con anticipo predefinito diverso per ogni tipo (modificabile nelle impostazioni).
+- Ripetizioni: ogni giorno, settimana, mese o anno, ogni N, con data di fine facoltativa. Le ripetizioni settimanali possono cadere su più giorni (es. lunedì, mercoledì e venerdì).
+- Per un impegno che si ripete puoi modificare o eliminare **solo una volta**, **quella e le successive** oppure **tutte**.
+- Fino a cinque promemoria per impegno (es. il giorno prima e un'ora prima), con anticipo predefinito diverso per ogni tipo. Quando scatta il promemoria più vicino, l'impegno viene evidenziato con il tempo che manca.
 - Viste giorno, settimana e mese.
-- Inserimento rapido: frasi come «dentista il 20 novembre alle 15» o «chiamare il commercialista venerdì» vengono interpretate e mostrate in un modulo da confermare.
+- Inserimento rapido: frasi come «dentista il 20 novembre alle 15», «chiamare il commercialista venerdì» o «palestra lunedì, mercoledì e venerdì alle 18» vengono interpretate (date, orari, ripetizioni) e mostrate in un modulo da confermare.
 - Dettatura vocale nella barra di inserimento rapido (Chrome su Android).
 
 **Progetti**
 - Nome, obiettivo, descrizione, scadenza, note.
 - Passaggi da spuntare, con barra di avanzamento e "prossimo passo" visibile.
+- Ogni passaggio si può fissare in agenda: quando segni fatto l'impegno, il passaggio si spunta anche nel progetto.
 - Stati: attivo, in pausa, completato, archiviato.
 - Se un progetto è fermo da almeno due settimane, la schermata Oggi può proporre di riprenderlo. Con "Non ora" la proposta sparisce per due settimane. Nessuna serie, nessun punteggio.
 
@@ -73,5 +75,8 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 Non inserire mai chiavi API in questi file: sono pubblici. La chiave si inserisce dall'app e resta sul telefono.
 
 ## Aggiornamenti
+
+A ogni nuova versione: `sh scripts/nuova-versione.sh X.Y.Z` aggiorna il numero negli indirizzi dei file, così i telefoni non mescolano file vecchi e nuovi.
+
 
 Ogni modifica caricata su GitHub viene pubblicata in un paio di minuti. Se il telefono mostra ancora la versione precedente, chiudi e riapri l'app.

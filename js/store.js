@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.1.2';
+import { todayISO } from './dates.js?v=2.2.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -49,6 +49,12 @@ const str = v => (v == null ? '' : String(v));
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
 
+function normReminders(e) {
+  const list = Array.isArray(e.reminders) ? e.reminders : Number.isFinite(e.reminder) ? [e.reminder] : [];
+  return [...new Set(list.map(Number).filter(m => Number.isFinite(m) && m >= 0 && m <= 525600).map(Math.round))]
+    .sort((a, b) => b - a).slice(0, 5);
+}
+
 export function normEvent(e = {}) {
   const r = e.recurrence || {};
   return {
@@ -65,8 +71,14 @@ export function normEvent(e = {}) {
       freq: ['none', 'daily', 'weekly', 'monthly', 'yearly'].includes(r.freq) ? r.freq : 'none',
       interval: Math.max(1, parseInt(r.interval, 10) || 1),
       until: isDate(r.until) ? r.until : '',
+      // giorni della settimana per le ripetizioni settimanali (0 = domenica … 6 = sabato)
+      days: r.freq === 'weekly' && Array.isArray(r.days)
+        ? [...new Set(r.days.map(Number).filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [],
     },
-    reminder: Number.isFinite(e.reminder) && e.reminder >= 0 ? e.reminder : null,
+    // più promemoria per impegno, in minuti di anticipo (dal più lontano al più vicino)
+    reminders: normReminders(e),
+    exdates: Array.isArray(e.exdates) ? [...new Set(e.exdates.filter(isDate))] : [], // ripetizioni saltate
+    link: e.link && e.link.projectId ? { projectId: str(e.link.projectId), stepId: str(e.link.stepId) } : null,
     done: Array.isArray(e.done) ? e.done.filter(isDate) : [],
     createdAt: str(e.createdAt) || nowISO(),
     updatedAt: str(e.updatedAt) || nowISO(),
@@ -133,7 +145,7 @@ function migrateV1(o, n) {
     n.events.push(normEvent({
       id: r.id, title: r.title, date: r.date || todayISO(), start: r.time || '',
       type: r.time ? 'appuntamento' : 'attivita',
-      reminder: r.time ? 1440 : 60,
+      reminders: [r.time ? 1440 : 60],
       notes: r.date ? '' : 'Data non indicata nella versione precedente: controlla.',
     }));
   }

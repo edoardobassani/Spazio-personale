@@ -1,7 +1,7 @@
 // Inserimento rapido: interpreta frasi come "dentista il 20 novembre alle 15".
 // Non usa l'AI: riconosce date, orari e tipo con regole semplici.
 // Il risultato viene sempre mostrato in un modulo da confermare.
-import { toISO, addDays, pad } from './dates.js?v=2.1.2';
+import { toISO, addDays, pad } from './dates.js?v=2.2.0';
 
 const MONTHS = {
   gennaio: 1, febbraio: 2, marzo: 3, aprile: 4, maggio: 5, giugno: 6, luglio: 7, agosto: 8,
@@ -32,6 +32,34 @@ export function parseQuick(input, now = new Date()) {
   let type = null;
   if (/\b(scadenza|scade|scadono|entro|pagare|pagamento|bolletta|rinnovo|rinnovare|consegnare)\b/.test(lc)) type = 'scadenza';
   else if (/\b(dentista|medico|visita|appuntamento|riunione|incontro|cena|pranzo|colloquio|aperitivo|parrucchiere|barbiere|meccanico|veterinario)\b/.test(lc)) type = 'appuntamento';
+
+  // ---- Ripetizione ("ogni martedì", "tutti i giorni", "lunedì, mercoledì e venerdì")
+  let recurrence = null;
+  const DN = 'lunedi|martedi|mercoledi|giovedi|venerdi|sabato|domenica|domeniche';
+  const wdOf = w => (w === 'domeniche' ? 0 : WD[w]);
+  const dayList = str => [...new Set(str.split(/\s*(?:,|\be\b)\s*/).map(x => x.trim()).filter(Boolean).map(wdOf))];
+  let wd0 = null; // giorni da cui calcolare la prima data
+  if ((m = lc.match(new RegExp(`\\b(?:ogni|tutti i|tutte le|di)\\s+((?:${DN})(?:\\s*(?:,|e)\\s*(?:${DN}))*)\\b`)))
+    || (m = lc.match(new RegExp(`\\b((?:${DN})(?:\\s*,\\s*(?:${DN}))*\\s+e\\s+(?:${DN}))\\b`)))) {
+    const days = dayList(m[1]);
+    // "di lunedì" da solo non è una ripetizione: lo diventa solo con più giorni
+    if (!/^di\s/.test(m[0]) || days.length > 1) {
+      recurrence = { freq: 'weekly', interval: 1, days: days.length > 1 ? days : [] };
+      wd0 = days;
+      cut(m);
+    }
+  } else if ((m = lc.match(/\b(?:ogni giorno|tutti i giorni|ogni mattina|ogni sera|quotidianamente)\b/))) {
+    recurrence = { freq: 'daily', interval: 1 }; cut(m);
+  } else if ((m = lc.match(/\bogni (\d+|due|tre|quattro|cinque|sei|sette|otto|dieci) (giorni|settimane|mesi|anni)\b/))) {
+    const n = NUM[m[1]] || +m[1];
+    recurrence = { freq: { giorni: 'daily', settimane: 'weekly', mesi: 'monthly', anni: 'yearly' }[m[2]], interval: n }; cut(m);
+  } else if ((m = lc.match(/\b(?:ogni settimana|tutte le settimane|settimanalmente|una volta a settimana)\b/))) {
+    recurrence = { freq: 'weekly', interval: 1 }; cut(m);
+  } else if ((m = lc.match(/\b(?:ogni mese|tutti i mesi|mensilmente|una volta al mese)\b/))) {
+    recurrence = { freq: 'monthly', interval: 1 }; cut(m);
+  } else if ((m = lc.match(/\b(?:ogni anno|tutti gli anni|annualmente|una volta all'anno)\b/))) {
+    recurrence = { freq: 'yearly', interval: 1 }; cut(m);
+  }
 
   // ---- Data
   const mn = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|');
@@ -100,6 +128,15 @@ export function parseQuick(input, now = new Date()) {
   title = title.replace(/^(il|lo|la|di)\s+/i, '');
   if (title) title = title[0].toUpperCase() + title.slice(1);
 
+  // Ripetizione settimanale senza data: parto dal primo giorno utile (anche oggi)
+  if (wd0 && !date) {
+    const nowHM0 = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    for (let k = 0; k < 8; k++) {
+      const dt = addDays(today, k);
+      if (wd0.includes(dt.getDay()) && !(k === 0 && start && start <= nowHM0)) { date = toISO(dt); break; }
+    }
+  }
+  if (recurrence) notes.push('ripetizione');
   const ix = notes.indexOf('stasera');
   if (ix >= 0) notes.splice(ix, 1, ...(start ? [] : ['Ho capito "stasera": se vuoi, aggiungi un orario.']));
   if (!date) {
@@ -112,5 +149,9 @@ export function parseQuick(input, now = new Date()) {
       notes.push('Non ho trovato una data: ho messo oggi.');
     }
   }
-  return { title, date, start, end, type, notes };
+  const ri = notes.indexOf('ripetizione');
+  if (ri >= 0) notes.splice(ri, 1);
+  // Tipo: una cosa che si ripete senza parole da appuntamento è un'attività (es. palestra)
+  if (recurrence && type === 'appuntamento' && !/\b(dentista|medico|visita|appuntamento|riunione|incontro|cena|pranzo|colloquio|aperitivo|parrucchiere|barbiere|meccanico|veterinario|lezione|corso)\b/.test(fold(input))) type = 'attivita';
+  return { title, date, start, end, type, notes, recurrence };
 }
