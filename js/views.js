@@ -1,8 +1,8 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.5.0';
-import * as D from './dates.js?v=2.5.0';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.5.0';
-import { renderFreeTime, renderSaved } from './learn.js?v=2.5.0';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.6.0';
+import * as D from './dates.js?v=2.6.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.6.0';
+import { renderFreeTime, renderSaved } from './learn.js?v=2.6.0';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -97,24 +97,46 @@ export function quickAdd(placeholder = 'Es. dentista il 20 novembre alle 15') {
 function itemRow(it, { showDate = false } = {}) {
   const e = it.ev;
   const rs = reminderState(it);
-  const bell = !!rs;
   const canDone = e.type !== 'appuntamento';
-  const time = e.start ? `${e.start}${e.end ? '–' + e.end : ''}` : e.type === 'scadenza' ? 'Entro oggi' : 'In giornata';
-  const meta = [TYPE[e.type].label, e.location && `${icon('pin', 'xs')}${esc(e.location)}`, recLabel(e.recurrence) && icon('repeat', 'xs'), e.link && icon('layers', 'xs')]
-    .filter(Boolean).join('<span class="sep">·</span>');
+  const soon = rs === 'soon' && untilLabel(it);
+  const meta = [
+    showDate && esc(D.relDay(it.date)),
+    e.end && `fino alle ${esc(e.end)}`,
+    !e.start && e.type === 'scadenza' && 'Scadenza',
+    e.location && `${icon('pin', 'xs')}${esc(e.location)}`,
+    soon && `<em class="soon-tag">${icon('bell', 'xs')}${soon}</em>`,
+    !soon && rs && icon('bell', 'xs accent'),
+    recLabel(e.recurrence) && icon('repeat', 'xs muted-ic'),
+    e.link && icon('layers', 'xs muted-ic'),
+  ].filter(Boolean);
   return `<div class="item ${TYPE[e.type].cls}${it.done ? ' is-done' : ''}${rs === 'soon' ? ' soon' : ''}">
+    <span class="item-time">${e.start ? esc(e.start) : ''}</span>
     ${canDone
       ? `<button class="check${it.done ? ' on' : ''}" data-action="toggle-done" data-id="${e.id}" data-date="${it.date}" aria-label="${it.done ? 'Segna come da fare' : 'Segna come fatto'}">${icon('check')}</button>`
-      : '<span class="bar"></span>'}
+      : `<span class="bar" title="${TYPE[e.type].label}"></span>`}
     <button class="item-main" data-action="edit-event" data-id="${e.id}" data-date="${it.date}">
-      <span class="item-time">${showDate ? `${D.relDay(it.date)} · ` : ''}${esc(time)}${bell ? ` ${icon('bell', 'xs accent')}` : ''}${rs === 'soon' && untilLabel(it) ? ` <em class="soon-tag">${untilLabel(it)}</em>` : ''}</span>
       <strong>${esc(e.title)}</strong>
-      <small>${meta}</small>
+      ${meta.length ? `<small>${meta.join(' ')}</small>` : ''}
     </button>
   </div>`;
 }
 
-const empty = (title, text) => `<div class="empty"><strong>${title}</strong><p>${text}</p></div>`;
+// Elenco raggruppato per giorno: il nome del giorno compare una volta sola
+function byDayList(list, max = 99) {
+  const days = [];
+  let shown = 0;
+  for (const it of list) {
+    if (shown >= max) break;
+    let g = days[days.length - 1];
+    if (!g || g.date !== it.date) days.push(g = { date: it.date, rows: [] });
+    g.rows.push(itemRow(it));
+    shown++;
+  }
+  return days.map(g => `<p class="group-day">${esc(D.relDay(g.date))}<span>${esc(D.fmt(g.date, { day: 'numeric', month: 'long' }))}</span></p>
+    <div class="list">${g.rows.join('')}</div>`).join('');
+}
+
+const empty = (title, text) => `<div class="empty"><strong>${title}</strong> ${text}</div>`;
 
 // ---------- OGGI
 
@@ -124,7 +146,8 @@ export function renderToday() {
   const greet = h < 5 ? 'Buonanotte' : h < 13 ? 'Buongiorno' : h < 18 ? 'Buon pomeriggio' : 'Buonasera';
   const today = items(t, t);
   const open = today.filter(i => !i.done);
-  const week = items(D.addDaysISO(t, 1), D.addDaysISO(t, 7));
+  // Le routine di ogni giorno si vedono già in "Oggi": nei prossimi giorni sarebbero solo ripetizioni
+  const week = items(D.addDaysISO(t, 1), D.addDaysISO(t, 7)).filter(i => !(i.ev.recurrence.freq === 'daily' && i.ev.recurrence.interval === 1));
   const reminders = activeReminders();
   const later = reminders.filter(r => r.date > D.addDaysISO(t, 7));
   const overdue = overdueDeadlines();
@@ -141,12 +164,11 @@ export function renderToday() {
     ${quickAdd()}
     ${overdue.length ? `<h2 class="sec warn">Scadenze passate</h2><div class="list">${overdue.map(i => itemRow(i, { showDate: true })).join('')}</div>` : ''}
     <h2 class="sec">Oggi</h2>
-    <div class="list">${today.length ? today.map(i => itemRow(i)).join('') : empty('Giornata libera', 'Non hai niente in agenda per oggi.')}</div>
+    ${today.length ? `<div class="list">${today.map(i => itemRow(i)).join('')}</div>` : empty('Giornata libera.', 'Non hai niente in agenda per oggi.')}
     ${later.length ? `<h2 class="sec">Da ricordare</h2><div class="list">${later.map(i => itemRow(i, { showDate: true })).join('')}</div>` : ''}
     <h2 class="sec">Prossimi giorni</h2>
-    <div class="list">${week.length ? week.slice(0, 6).map(i => itemRow(i, { showDate: true })).join('')
-      + (week.length > 6 ? `<a class="more" href="#impegni">Altri ${week.length - 6} nella settimana</a>` : '')
-      : empty('Settimana tranquilla', 'Niente in programma per i prossimi sette giorni.')}</div>
+    ${week.length ? byDayList(week, 8) + (week.length > 8 ? `<a class="more" href="#impegni">Vedi tutta la settimana (${week.length})</a>` : '')
+      : empty('Settimana tranquilla.', 'Niente in programma per i prossimi sette giorni.')}
     ${renderFreeTime()}
   </section>`;
 }
@@ -165,7 +187,7 @@ function rangeLabel() {
 
 function dayView(iso) {
   const list = items(iso, iso);
-  return `<div class="list">${list.length ? list.map(i => itemRow(i)).join('') : empty('Niente in programma', 'Tocca + per aggiungere qualcosa a questo giorno.')}</div>`;
+  return list.length ? `<div class="list">${list.map(i => itemRow(i)).join('')}</div>` : empty('Niente in programma.', 'Tocca + per aggiungere qualcosa a questo giorno.');
 }
 
 function weekView() {
@@ -545,7 +567,7 @@ function projectCard(p) {
   const next = p.steps.find(s => !s.done);
   return `<div class="card project ${p.status}">
     <button class="card-main" data-action="open-project" data-id="${p.id}">
-      <span class="card-top"><strong>${esc(p.name)}</strong>${p.status !== 'attivo' ? `<em class="chip">${PSTATUS[p.status]}</em>` : ''}</span>
+      <span class="card-top"><strong>${esc(p.name)}</strong>${p.status === 'completato' || p.status === 'archiviato' ? `<em class="chip">${PSTATUS[p.status]}</em>` : ''}</span>
       ${p.goal ? `<small>${esc(p.goal)}</small>` : p.description ? `<small>${esc(p.description)}</small>` : ''}
       ${total ? `<span class="progress" aria-label="${done} di ${total} passaggi"><i style="width:${Math.round(done / total * 100)}%"></i></span>
         <small class="muted">${done} di ${total} passaggi${p.deadline ? ` · entro ${D.fmt(p.deadline, { day: 'numeric', month: 'short' })}` : ''}</small>`
@@ -567,7 +589,7 @@ export function renderProjects() {
     <p class="intro">Le cose che vuoi portare avanti, con i tuoi tempi. Puoi metterle in pausa e riprenderle quando vuoi.</p>
     ${active.length ? `<h2 class="sec">Attivi</h2><div class="cards">${active.map(projectCard).join('')}</div>` : ''}
     ${paused.length ? `<h2 class="sec">In pausa</h2><div class="cards">${paused.map(projectCard).join('')}</div>` : ''}
-    ${!active.length && !paused.length ? empty('Nessun progetto in corso', "Aggiungi un'idea anche solo per non perderla di vista.") : ''}
+    ${!active.length && !paused.length ? empty('Nessun progetto in corso.', "Aggiungi un'idea anche solo per non perderla di vista.") : ''}
     ${archived.length ? `<button class="sec-toggle" data-action="toggle-archive">${ui.archive ? 'Nascondi' : 'Mostra'} archivio (${archived.length})</button>
       ${ui.archive ? `<div class="cards">${archived.map(projectCard).join('')}</div>` : ''}` : ''}
   </section>`;
@@ -701,9 +723,9 @@ export function renderInterests() {
       <button class="btn primary">Aggiungi</button>
     </form>
     <h2 class="sec">Interessi stabili</h2>
-    <div class="list">${stable.length ? stable.map(interestRow).join('') : empty('Ancora nessuno', 'Gli argomenti che ti accompagnano da tempo.')}</div>
+    ${stable.length ? `<div class="list">${stable.map(interestRow).join('')}</div>` : empty('Ancora nessuno.', 'Gli argomenti che ti accompagnano da tempo.')}
     <h2 class="sec">Curiosità del momento</h2>
-    <div class="list">${cur.length ? cur.map(interestRow).join('') : empty('Nessuna curiosità', 'Le cose che ti hanno preso di recente, senza impegno.')}</div>
+    ${cur.length ? `<div class="list">${cur.map(interestRow).join('')}</div>` : empty('Nessuna curiosità.', 'Le cose che ti hanno preso di recente, senza impegno.')}
     ${paused.length ? `<h2 class="sec">In pausa</h2><div class="list">${paused.map(interestRow).join('')}</div>` : ''}
     ${renderSaved()}
     <button class="btn profile-btn" data-action="open-profile">${icon('spark', 'xs')} Cosa ho imparato di te</button>
@@ -814,7 +836,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.5.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.6.0</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');

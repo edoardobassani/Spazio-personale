@@ -1,6 +1,6 @@
 // Adattatore per i fornitori compatibili con l'API di OpenAI: OpenAI e OpenRouter.
 // Stesse funzioni dell'adattatore Gemini: listModels, generate, generateJSON.
-import { AIError } from './gemini.js?v=2.5.0';
+import { AIError } from './gemini.js?v=2.6.0';
 
 const parseArgs = s => { try { return typeof s === 'string' ? JSON.parse(s || '{}') : (s || {}); } catch (_) { return {}; } };
 let seq = 0;

@@ -1,7 +1,7 @@
 // Service worker: rende l'app disponibile anche senza connessione.
 // Strategia "prima la rete": se sei online scarichi sempre l'ultima versione,
 // se sei offline usi la copia salvata. Così un aggiornamento non resta bloccato in cache.
-const VERSION = '2.5.0';
+const VERSION = '2.6.0';
 const CACHE = `spazio-${VERSION}`;
 const CORE = [
   './', './index.html', `./styles.css?v=${VERSION}`, './manifest.webmanifest', './icon.svg', './icon-192.png',

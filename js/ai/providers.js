@@ -1,8 +1,8 @@
 // Elenco dei fornitori AI collegabili. Per aggiungerne uno basta un adattatore
 // con listModels / generate / generateJSON e una voce qui sotto.
-import * as gemini from './gemini.js?v=2.5.0';
-import * as anthropic from './anthropic.js?v=2.5.0';
-import { make } from './openai.js?v=2.5.0';
+import * as gemini from './gemini.js?v=2.6.0';
+import * as anthropic from './anthropic.js?v=2.6.0';
+import { make } from './openai.js?v=2.6.0';
 
 export const PROVIDERS = {
   gemini: {

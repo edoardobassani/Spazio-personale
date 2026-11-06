@@ -1,10 +1,10 @@
 // Tempo libero, proposte, feedback e quello che l'app impara dalle tue scelte.
 // Tutto è calcolato dai tuoi dati e si può vedere, correggere e cancellare dal profilo.
-import { state, commit, uid } from './store.js?v=2.5.0';
-import * as D from './dates.js?v=2.5.0';
-import { esc, icon, toast, openSheet } from './ui.js?v=2.5.0';
-import { items, openEventSheet, openSettings } from './views.js?v=2.5.0';
-import { askJSON, isConnected } from './ai/assistant.js?v=2.5.0';
+import { state, commit, uid } from './store.js?v=2.6.0';
+import * as D from './dates.js?v=2.6.0';
+import { esc, icon, toast, openSheet } from './ui.js?v=2.6.0';
+import { items, openEventSheet, openSettings } from './views.js?v=2.6.0';
+import { askJSON, isConnected } from './ai/assistant.js?v=2.6.0';
 
 const L = () => state.settings.learning;
 const ui = { day: '', busy: false };
@@ -320,23 +320,21 @@ export function plan(id) {
 // ---------- Schermate
 
 function proposalCard(it) {
-  const meta = [durLabel(it.minutes), it.start && `dalle ${it.start}`, it.cost && (it.cost === 'gratis' ? 'gratis' : `costo ${it.cost}`), it.outdoor && 'all\'aperto'].filter(Boolean).join(' · ');
+  const meta = [durLabel(it.minutes), it.start && `dalle ${it.start}`, it.cost === 'gratis' ? 'gratis' : it.cost && `costo ${it.cost}`, it.outdoor && 'all\'aperto'].filter(Boolean).join(', ');
   if (it.status === 'no' || it.status === 'conosciuto') {
-    return `<div class="prop-card dim"><p>${esc(it.title)} <em>· ${it.status === 'no' ? 'scartata' : 'già conosciuta'}</em></p></div>`;
+    return `<div class="prop-card dim"><p>${esc(it.title)}</p><em>${it.status === 'no' ? 'scartata' : 'già conosciuta'}</em></div>`;
   }
-  const fb = (v, label, ic) => `<button class="fb${it.status === v ? ' on' : ''}" data-action="prop-fb" data-id="${it.id}" data-v="${v}">${ic}${label}</button>`;
+  const fb = (v, label) => `<button class="fb${it.status === v ? ' on' : ''}" data-action="prop-fb" data-id="${it.id}" data-v="${v}">${label}</button>`;
   return `<div class="prop-card${it.status ? ' answered' : ''}">
-    <span class="suggest-tag">${icon('spark', 'xs')} ${esc(meta)}</span>
     <strong>${esc(it.title)}</strong>
+    <p class="prop-meta">${esc(meta)}</p>
     ${it.detail ? `<p>${esc(it.detail)}</p>` : ''}
     ${it.why ? `<p class="why">${esc(it.why)}</p>` : ''}
-    <div class="suggest-actions">
-      <button class="btn small primary" data-action="prop-plan" data-id="${it.id}">${icon('calendar', 'xs')} ${it.status === 'scelto' ? 'Di nuovo in agenda' : 'Mettilo in agenda'}</button>
+    <div class="prop-actions">
+      <button class="btn small primary" data-action="prop-plan" data-id="${it.id}">${icon('calendar', 'xs')} ${it.status === 'scelto' ? 'Di nuovo in agenda' : 'In agenda'}</button>
       ${it.projectId ? `<button class="btn small ghost" data-action="open-project" data-id="${it.projectId}">Progetto</button>` : ''}
     </div>
-    <div class="fb-row">
-      ${fb('interessa', 'Mi interessa', '👍 ')}${fb('no', 'Non fa per me', '👎 ')}${fb('conosciuto', 'Già lo so', '✓ ')}${fb('dopo', 'Dopo', '🔖 ')}
-    </div>
+    <div class="fb-row">${fb('interessa', 'Mi interessa')}${fb('no', 'No')}${fb('conosciuto', 'Già fatto')}${fb('dopo', 'Dopo')}</div>
   </div>`;
 }
 
@@ -350,13 +348,13 @@ export function renderFreeTime() {
   return `<h2 class="sec">Tempo libero</h2>
     <div class="free-card">
       <div class="day-chips">${opts.map(o => `<button class="${o.date === ui.day ? 'on' : ''}" data-action="prop-day" data-date="${o.date}">${esc(o.label)}</button>`).join('')}</div>
-      <p class="slots">${slots.length ? `Libero: ${slots.map(s => `${s.start}–${s.end}`).join(', ')}` : 'Nessun tempo libero in questo giorno.'}
-        <button class="link" data-action="open-day-settings">Orari</button></p>
+      <p class="slots">${slots.length ? slots.map(s => `<span>${s.start}–${s.end}</span>`).join('') : 'Nessun tempo libero in questo giorno.'}
+        <button class="link" data-action="open-day-settings">Modifica orari</button></p>
       <button class="btn primary propose" data-action="propose"${ui.busy || !slots.length ? ' disabled' : ''}>${icon('spark', 'xs')} ${ui.busy ? 'Ci penso…' : cur ? 'Altre proposte' : 'Proponimi qualcosa'}</button>
       ${!conn ? `<p class="hint">Proposte semplici dai tuoi progetti e interessi. <a href="#assistente">Collega l'assistente</a> per proposte su misura.</p>` : ''}
     </div>
-    ${cur && cur.items.length ? `<div class="list">${cur.items.map(proposalCard).join('')}</div>
-      <p class="hint center">${cur.source === 'ai' ? 'Proposte dell\'assistente' : 'Proposte automatiche'}: le tue risposte aiutano a migliorare le prossime.</p>` : ''}`;
+    ${cur && cur.items.length ? `<div class="prop-list">${cur.items.map(proposalCard).join('')}</div>
+      <p class="hint center">${cur.source === 'ai' ? 'Proposte dell\'assistente' : 'Proposte automatiche'}. Le tue risposte migliorano le prossime.</p>` : ''}`;
 }
 
 export function renderSaved() {

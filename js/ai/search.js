@@ -2,8 +2,8 @@
 // 1) Google, tramite la ricerca integrata in Gemini, se la chiave lo consente
 //    (di solito serve un account Google con fatturazione attiva).
 // 2) Altrimenti Wikipedia in italiano: gratuita, ma senza notizie, eventi o orari attuali.
-import { state, commit } from '../store.js?v=2.5.0';
-import * as D from '../dates.js?v=2.5.0';
+import { state, commit } from '../store.js?v=2.6.0';
+import * as D from '../dates.js?v=2.6.0';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const RECHECK_DAYS = 7;
