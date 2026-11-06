@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.2.0';
+import { todayISO } from './dates.js?v=2.3.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -18,7 +18,7 @@ export const onChange = fn => listeners.push(fn);
 export function defaultAI() {
   return {
     provider: 'gemini', model: '', models: [], speak: false, about: '',
-    perms: { events: true, projects: true, interests: true, notes: false },
+    perms: { events: true, projects: true, interests: true, notes: false, learning: true },
   };
 }
 
@@ -40,7 +40,8 @@ function defaults() {
     events: [],
     projects: [],
     interests: [],
-    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 }, ai: defaultAI() },
+    feedback: [], saved: [], proposals: [],
+    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 }, ai: defaultAI(), day: normDay(), learning: { enabled: true, forgotten: [] } },
     meta: { createdAt: nowISO(), lastExport: null, migratedFromV1: false },
   };
 }
@@ -116,6 +117,39 @@ export function normInterest(i = {}) {
   };
 }
 
+// Orari della giornata, usati per calcolare il tempo libero
+function normDay(x = {}) {
+  const t = v => (isTime(v) ? v : '');
+  return {
+    wake: t(x.wake) || '06:00',
+    sleep: t(x.sleep) || '22:00',
+    workDays: Array.isArray(x.workDays) ? [...new Set(x.workDays.map(Number).filter(n => n >= 0 && n <= 6))].sort() : [1, 2, 3, 4, 5],
+    workStart: t(x.workStart),
+    workEnd: t(x.workEnd),
+  };
+}
+
+// Risposte alle proposte: servono per imparare cosa ti piace
+const FEEDBACK = ['interessa', 'no', 'conosciuto', 'dopo', 'scelto', 'ignorato'];
+function normFeedback(f) {
+  return {
+    at: str(f.at) || nowISO(), value: FEEDBACK.includes(f.value) ? f.value : 'ignorato',
+    title: str(f.title).slice(0, 160), kind: str(f.kind).slice(0, 30),
+    tags: (Array.isArray(f.tags) ? f.tags : []).map(x => str(x).toLowerCase().trim().slice(0, 40)).filter(Boolean).slice(0, 6),
+  };
+}
+function normSaved(x) {
+  return {
+    id: str(x.id) || uid(), title: str(x.title).slice(0, 160) || 'Senza titolo', detail: str(x.detail).slice(0, 1000),
+    why: str(x.why).slice(0, 500), minutes: Number.isFinite(+x.minutes) ? +x.minutes : 0,
+    tags: (Array.isArray(x.tags) ? x.tags : []).map(str).slice(0, 6), createdAt: str(x.createdAt) || nowISO(),
+  };
+}
+function normProposals(p) {
+  if (!p || !isDate(p.date) || !Array.isArray(p.items)) return null;
+  return { date: p.date, source: p.source === 'ai' ? 'ai' : 'regole', createdAt: str(p.createdAt) || nowISO(), items: p.items.filter(i => i && i.title).slice(0, 5) };
+}
+
 export function normalize(raw) {
   const d = defaults();
   const s = raw && typeof raw === 'object' ? raw : {};
@@ -123,11 +157,19 @@ export function normalize(raw) {
   return {
     version: 2,
     events: arr(s.events).map(normEvent),
+    feedback: arr(s.feedback).map(normFeedback).slice(-400),
+    saved: arr(s.saved).map(normSaved).slice(0, 100),
+    proposals: (Array.isArray(s.proposals) ? s.proposals : []).map(normProposals).filter(Boolean).slice(-4),
     projects: arr(s.projects).map(normProject),
     interests: arr(s.interests).map(normInterest),
     settings: {
       reminders: { ...d.settings.reminders, ...(s.settings && s.settings.reminders) },
       ai: normAI(s.settings && s.settings.ai),
+      day: normDay(s.settings && s.settings.day),
+      learning: {
+        enabled: !(s.settings && s.settings.learning && s.settings.learning.enabled === false),
+        forgotten: (s.settings && s.settings.learning && Array.isArray(s.settings.learning.forgotten) ? s.settings.learning.forgotten : []).map(str).slice(0, 200),
+      },
     },
     meta: { ...d.meta, ...(s.meta || {}) },
   };

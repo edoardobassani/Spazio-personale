@@ -1,7 +1,8 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.2.0';
-import * as D from './dates.js?v=2.2.0';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.2.0';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.3.0';
+import * as D from './dates.js?v=2.3.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.3.0';
+import { renderFreeTime, renderSaved } from './learn.js?v=2.3.0';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -83,38 +84,6 @@ function overdueDeadlines() {
   return items(D.addDaysISO(t, -60), D.addDaysISO(t, -1)).filter(it => it.ev.type === 'scadenza' && !it.done);
 }
 
-function suggestions() {
-  const t = D.todayISO();
-  const out = [];
-  const projects = state.projects.filter(p => (p.status === 'attivo' || p.status === 'pausa') && !(p.snoozedUntil > t));
-  const stale = projects
-    .map(p => ({ p, days: D.daysBetween(D.toISO(new Date(p.lastActivityAt)), t) }))
-    .filter(x => x.days >= 14)
-    .sort((a, b) => b.days - a.days)[0];
-  if (stale) {
-    const weeks = Math.round(stale.days / 7);
-    out.push({
-      kind: 'project', id: stale.p.id,
-      text: `Non tocchi «${stale.p.name}» da ${weeks <= 1 ? 'un paio di settimane' : weeks + ' settimane'}. Ti va di riprenderlo?`,
-      why: stale.p.status === 'pausa' ? 'Progetto in pausa' : 'Progetto fermo da un po\'',
-    });
-  }
-  const next = projects.find(p => p.status === 'attivo' && (!stale || p.id !== stale.p.id) && p.steps.some(s => !s.done));
-  if (next) {
-    out.push({
-      kind: 'project', id: next.id,
-      text: `Prossimo passo per «${next.name}»: ${next.steps.find(s => !s.done).text}`,
-      why: 'Dal tuo progetto attivo',
-    });
-  }
-  const ints = state.interests.filter(i => i.status === 'attivo' && !(i.snoozedUntil > t));
-  if (ints.length && out.length < 2) {
-    const i = ints[D.daysBetween('2026-01-01', t) % ints.length];
-    out.push({ kind: 'interest', id: i.id, text: `Potresti dedicare un po' di tempo libero a «${i.name}».`, why: i.kind === 'curiosita' ? 'Curiosità del momento' : 'Dai tuoi interessi' });
-  }
-  return out.slice(0, 2);
-}
-
 // ---------- Componenti
 
 export function quickAdd(placeholder = 'Es. dentista il 20 novembre alle 15') {
@@ -159,8 +128,6 @@ export function renderToday() {
   const reminders = activeReminders();
   const later = reminders.filter(r => r.date > D.addDaysISO(t, 7));
   const overdue = overdueDeadlines();
-  const light = open.length <= 2 && h < 22;
-  const sugg = light ? suggestions() : [];
 
   const summary = open.length ? `${plural(open.length, 'cosa', 'cose')} in programma oggi`
     : today.length ? 'Hai fatto tutto quello che avevi in programma' : 'Oggi non hai impegni';
@@ -180,14 +147,7 @@ export function renderToday() {
     <div class="list">${week.length ? week.slice(0, 6).map(i => itemRow(i, { showDate: true })).join('')
       + (week.length > 6 ? `<a class="more" href="#impegni">Altri ${week.length - 6} nella settimana</a>` : '')
       : empty('Settimana tranquilla', 'Niente in programma per i prossimi sette giorni.')}</div>
-    ${sugg.length ? `<h2 class="sec">Per il tempo libero</h2>
-      <div class="list">${sugg.map(s => `<div class="suggest">
-        <span class="suggest-tag">${icon('spark', 'xs')} Suggerimento · ${esc(s.why)}</span>
-        <p>${esc(s.text)}</p>
-        <div class="suggest-actions">
-          <button class="btn small" data-action="open-${s.kind}" data-id="${s.id}">Apri</button>
-          <button class="btn small ghost" data-action="snooze-${s.kind}" data-id="${s.id}">Non ora</button>
-        </div></div>`).join('')}</div>` : ''}
+    ${renderFreeTime()}
   </section>`;
 }
 
@@ -745,6 +705,8 @@ export function renderInterests() {
     <h2 class="sec">Curiosità del momento</h2>
     <div class="list">${cur.length ? cur.map(interestRow).join('') : empty('Nessuna curiosità', 'Le cose che ti hanno preso di recente, senza impegno.')}</div>
     ${paused.length ? `<h2 class="sec">In pausa</h2><div class="list">${paused.map(interestRow).join('')}</div>` : ''}
+    ${renderSaved()}
+    <button class="btn profile-btn" data-action="open-profile">${icon('spark', 'xs')} Cosa ho imparato di te</button>
     <div class="info-card">
       <strong>Scoperta di contenuti</strong>
       <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: conosce i tuoi interessi, se gli dai il permesso. Non ha accesso a internet, quindi non conosce le uscite più recenti.</p>
@@ -814,12 +776,27 @@ export function snooze(kind, id) {
 
 // ---------- IMPOSTAZIONI
 
-export function openSettings() {
+export function openSettings(section = '') {
   const s = stats();
   const last = state.meta.lastExport ? new Date(state.meta.lastExport).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : 'mai';
   const sel = (type) => `<select data-lead="${type}">${LEADS.map(([v, l]) => `<option value="${v}"${String(state.settings.reminders[type] ?? '') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   openSheet(`
     <div class="sheet-head"><h2>Impostazioni</h2><button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
+    <h3 class="sub" id="set-day">Le tue giornate</h3>
+    <p class="hint">Servono a calcolare il tempo libero per le proposte.</p>
+    <div class="form day-form">
+      <div class="row">
+        <label class="field"><span>Sveglia</span><input type="time" data-day="wake" value="${state.settings.day.wake}"></label>
+        <label class="field"><span>A letto</span><input type="time" data-day="sleep" value="${state.settings.day.sleep}"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span>Lavoro dalle</span><input type="time" data-day="workStart" value="${state.settings.day.workStart}"></label>
+        <label class="field"><span>alle</span><input type="time" data-day="workEnd" value="${state.settings.day.workEnd}"></label>
+      </div>
+      <div class="field"><span>Giorni di lavoro</span>
+        <div class="wd-pick">${[1, 2, 3, 4, 5, 6, 0].map(n => `<label class="${state.settings.day.workDays.includes(n) ? 'on' : ''}"><input type="checkbox" data-wday value="${n}"${state.settings.day.workDays.includes(n) ? ' checked' : ''}>${'DLMMGVS'[n]}</label>`).join('')}</div></div>
+      <p class="hint">Lascia vuoto l'orario di lavoro se cambia spesso: puoi sempre segnare i turni come impegni.</p>
+    </div>
     <h3 class="sub">Promemoria predefiniti</h3>
     <p class="hint">Valgono per i nuovi impegni; puoi sempre cambiarli caso per caso.</p>
     <div class="form">
@@ -837,7 +814,17 @@ export function openSettings() {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.2.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.3.0</p>`, sheet => {
+    sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
+      state.settings.day[el.dataset.day] = el.value;
+      commit(); toast('Salvato');
+    }));
+    sheet.querySelectorAll('[data-wday]').forEach(el => el.addEventListener('change', () => {
+      el.parentNode.classList.toggle('on', el.checked);
+      state.settings.day.workDays = [...sheet.querySelectorAll('[data-wday]:checked')].map(x => +x.value).sort();
+      commit();
+    }));
+    if (section === 'day') setTimeout(() => sheet.querySelector('#set-day').scrollIntoView({ block: 'start' }), 60);
     sheet.querySelectorAll('[data-lead]').forEach(el => el.addEventListener('change', () => {
       state.settings.reminders[el.dataset.lead] = el.value === '' ? null : +el.value;
       commit(); toast('Salvato');

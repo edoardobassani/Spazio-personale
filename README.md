@@ -1,4 +1,4 @@
-# Spazio personale — v2.2
+# Spazio personale — v2.3
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -10,7 +10,9 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 - Data, saluto e riepilogo della giornata.
 - Impegni di oggi, scadenze passate non completate, prossimi 7 giorni.
 - Promemoria attivi: un impegno compare in "Da ricordare" quando inizia il suo anticipo (es. il giorno prima).
-- Nei giorni con pochi impegni: al massimo due proposte per il tempo libero, scelte con regole semplici dai tuoi progetti e interessi. Sono segnate come "Suggerimento" e hanno un aspetto diverso dai tuoi impegni.
+- **Tempo libero**: per oggi, domani o il weekend l'app calcola gli intervalli liberi tra sveglia, lavoro, impegni e ora di andare a letto (orari in Impostazioni → Le tue giornate).
+- **Proponimi qualcosa**: fino a tre proposte che stanno nel tempo libero, con durata, costo, perché e un pulsante per metterle in agenda. Con l'assistente collegato sono su misura; senza, vengono da progetti, interessi e cose salvate. Hanno un aspetto diverso dai tuoi impegni.
+- Su ogni proposta: *Mi interessa*, *Non fa per me*, *Già lo so*, *Dopo* (finisce in Interessi → Salvati per dopo).
 
 **Impegni**
 - Tre tipi: appuntamento, attività (si può spuntare), scadenza (si può spuntare).
@@ -32,6 +34,12 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 **Interessi**
 - Interessi stabili e curiosità del momento.
 - Pausa e ripresa, note, modifica ed eliminazione.
+- Salvati per dopo: da mettere in agenda, segnare come fatti o togliere.
+
+**Cosa ho imparato di te** (Interessi → in fondo)
+- L'app impara dalle risposte alle proposte (anche quelle ignorate contano poco) e dagli impegni che segni come fatti: temi che ti interessano, temi che scarti, abitudini (es. «Palestra: di solito verso le 18, lun, mer, ven»).
+- Tutto è visibile: puoi far dimenticare una singola cosa, cancellare tutto o mettere in pausa l'apprendimento.
+- Le proposte e l'assistente lo usano come indicazione, se gli dai il permesso.
 
 **Assistente (Google Gemini, piano gratuito)**
 - Conversazione scritta o dettata, con lettura facoltativa delle risposte ad alta voce (voce del telefono).
@@ -52,7 +60,6 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 
 - **Notifiche sul telefono ad app chiusa.** I promemoria compaiono quando apri l'app. Per notifiche affidabili su Android serve un piccolo servizio esterno (fase 3).
 - **Ricerca sul web per l'assistente** (eventi, notizie, contenuti recenti).
-- **Apprendimento automatico delle preferenze**: per ora il contesto si scrive a mano in «Su di te».
 - **Altri fornitori AI**: la struttura li prevede (`js/ai/`), per ora c'è solo Gemini.
 - **Sincronizzazione tra dispositivi**: per passare a un altro dispositivo usa backup e ripristino (fase 6).
 
@@ -67,6 +74,7 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 | `js/store.js` | Salvataggio dei dati, importazione dalla v0.1, backup |
 | `js/dates.js` | Calcoli su date e ripetizioni |
 | `js/parse.js` | Interpretazione delle frasi dell'inserimento rapido |
+| `js/learn.js` | Tempo libero, proposte, feedback, profilo appreso |
 | `js/ai/assistant.js` | Conversazione, proposte, voce, impostazioni dell'assistente |
 | `js/ai/gemini.js` | Collegamento a Google Gemini (sostituibile con altri fornitori) |
 | `js/ai/tools.js` | Cosa l'assistente può leggere e proporre |

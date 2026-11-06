@@ -1,9 +1,10 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.2.0';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.2.0';
-import { parseQuick } from './parse.js?v=2.2.0';
-import * as V from './views.js?v=2.2.0';
-import * as AI from './ai/assistant.js?v=2.2.0';
+import { load, onChange } from './store.js?v=2.3.0';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.3.0';
+import { parseQuick } from './parse.js?v=2.3.0';
+import * as V from './views.js?v=2.3.0';
+import * as AI from './ai/assistant.js?v=2.3.0';
+import * as LEARN from './learn.js?v=2.3.0';
 
 const ROUTES = {
   oggi: V.renderToday,
@@ -65,6 +66,7 @@ const actions = {
   'snooze-project': el => V.snooze('project', el.dataset.id),
   'snooze-interest': el => V.snooze('interest', el.dataset.id),
   ...AI.actions,
+  ...LEARN.actions,
   voice: el => dictate(el.closest('form').q, el),
 };
 

@@ -112,6 +112,21 @@ export async function generate({ key, model, system, history, tools }) {
   };
 }
 
+// Risposta in formato JSON secondo uno schema (usata per le proposte)
+export async function generateJSON({ key, model, system, prompt, schema: sch }) {
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    systemInstruction: { parts: [{ text: system }] },
+    generationConfig: { temperature: 0.9, responseMimeType: 'application/json', responseSchema: schema(sch) },
+  };
+  const data = await call(`/${model}:generateContent`, key, body);
+  const cand = data.candidates && data.candidates[0];
+  const text = cand && cand.content && (cand.content.parts || []).filter(p => typeof p.text === 'string' && !p.thought).map(p => p.text).join('');
+  if (!text) throw new AIError('Il modello non ha risposto. Riprova.', 'empty');
+  try { return JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')); }
+  catch (e) { throw new AIError('La risposta del modello non era nel formato atteso. Riprova.', 'format'); }
+}
+
 export const info = {
   id: 'gemini',
   name: 'Google Gemini',

@@ -1,9 +1,10 @@
 // Assistente: conversazione, uso degli strumenti, proposte da confermare, voce.
-import { state, commit } from '../store.js?v=2.2.0';
-import * as D from '../dates.js?v=2.2.0';
-import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.2.0';
-import * as gemini from './gemini.js?v=2.2.0';
-import { toolDefs, runTool, applyProposal } from './tools.js?v=2.2.0';
+import { state, commit } from '../store.js?v=2.3.0';
+import * as D from '../dates.js?v=2.3.0';
+import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.3.0';
+import * as gemini from './gemini.js?v=2.3.0';
+import { toolDefs, runTool, applyProposal } from './tools.js?v=2.3.0';
+import { learnedSummary } from '../learn.js?v=2.3.0';
 
 const PROVIDERS = { gemini };
 const KEY_STORE = 'spazio-personale-ai-key';
@@ -70,18 +71,19 @@ Come rispondere:
 
 Dati a cui puoi accedere: ${can.length ? can.join(', ') : 'nessuno'}${p.notes ? ', comprese le note' : ' (senza le note personali)'}. Se ti serve qualcosa a cui non hai accesso, dillo.
 Promemoria predefiniti: appuntamenti ${r.appuntamento ?? 'nessuno'} min, attività ${r.attivita ?? 'nessuno'} min, scadenze ${r.scadenza ?? 'nessuno'} min prima.
-${ai().about.trim() ? `\nCosa l'utente ti ha detto di sé:\n${ai().about.trim()}` : ''}`;
+${ai().about.trim() ? `\nCosa l'utente ti ha detto di sé:\n${ai().about.trim()}` : ''}${p.learning && learnedSummary() ? `\nPreferenze e abitudini apprese dall'app (l'utente può correggerle; usale come indicazioni, non come regole):\n${learnedSummary()}` : ''}`;
 }
 
 // ---------- Invio di un messaggio
 
-async function generateWithFallback(req) {
+// Prova il modello scelto; se non è gratuito o non esiste più, passa al successivo
+async function withModel(run) {
   const tried = new Set();
   let model = ai().model;
   for (;;) {
     tried.add(model);
     try {
-      const res = await provider().generate({ ...req, model });
+      const res = await run(model);
       if (model !== ai().model) {
         ai().model = model; commit();
         chat.view.push({ role: 'info', text: `Il modello precedente non è disponibile gratuitamente: ora uso ${labelOf(model)}.` });
@@ -94,6 +96,14 @@ async function generateWithFallback(req) {
       model = next;
     }
   }
+}
+const generateWithFallback = req => withModel(model => provider().generate({ ...req, model }));
+
+// Domanda con risposta strutturata (JSON), usata da altre parti dell'app
+export async function askJSON({ system, prompt, schema }) {
+  const key = getKey();
+  if (!key || !ai().model) throw new gemini.AIError("L'assistente non è collegato.", 'key');
+  return withModel(model => provider().generateJSON({ key, model, system, prompt, schema }));
 }
 const labelOf = id => (ai().models.find(m => m.id === id) || { label: id.replace('models/', '') }).label;
 
@@ -335,6 +345,7 @@ export function openAISettings() {
       ${perm('projects', 'Progetti', 'Leggere i progetti e proporre modifiche')}
       ${perm('interests', 'Interessi', 'Leggere gli interessi e proporne di nuovi')}
       ${perm('notes', 'Note personali', 'Includere le note di impegni, progetti e interessi')}
+      ${perm('learning', 'Preferenze apprese', 'Usare quello che l\'app ha imparato dalle tue scelte')}
     </div>
     <h3 class="sub">Su di te</h3>
     <p class="hint">Facoltativo. Quello che scrivi qui viene inviato all'assistente a ogni richiesta, per dargli il contesto (orari, lavoro, abitudini, preferenze).</p>

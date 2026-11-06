@@ -352,3 +352,37 @@ a { color: var(--green); }
 .item.soon { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent), var(--shadow); }
 .soon-tag { font-style: normal; color: var(--accent); font-weight: 700; }
 .step-when { display: block; color: var(--green); font-size: 12.5px; font-weight: 600; text-decoration: none; }
+
+/* Tempo libero e proposte */
+.free-card { background: var(--paper); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.day-chips { display: flex; gap: 6px; overflow-x: auto; }
+.day-chips button { flex: none; border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 0 14px; min-height: 36px; font-weight: 650; font-size: 14px; color: var(--ink2); }
+.day-chips button.on { background: var(--green); border-color: var(--green); color: var(--paper); }
+.slots { margin: 0; font-size: 14px; color: var(--ink2); }
+.link { border: 0; background: none; color: var(--green); font-weight: 650; padding: 0 4px; min-height: 32px; text-decoration: underline; }
+.propose { width: 100%; }
+.propose:disabled { opacity: .6; }
+.free-card .hint { margin: 0; }
+.hint.center { text-align: center; }
+.prop-card { border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); border-radius: var(--r); padding: 12px 14px; }
+.prop-card > strong { display: block; font-size: 16.5px; margin: 4px 0 2px; }
+.prop-card p { margin: 4px 0; font-size: 14.5px; }
+.prop-card .why { color: var(--ink2); font-size: 13.5px; }
+.prop-card .why::before { content: "Perché: "; font-weight: 700; }
+.prop-card .suggest-actions { margin-top: 8px; flex-wrap: wrap; }
+.prop-card.dim { padding: 8px 14px; opacity: .6; border-style: solid; border-color: var(--line); background: transparent; }
+.prop-card.dim p { margin: 0; }
+.prop-card.dim em { color: var(--muted); }
+.fb-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+.fb { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0 11px; min-height: 34px; font-size: 13px; font-weight: 600; color: var(--ink2); }
+.fb.on { background: var(--green); border-color: var(--green); color: var(--paper); }
+.item.saved { padding: 4px 6px 4px 14px; }
+.item-main.static { cursor: default; }
+.saved-actions { display: flex; }
+.profile-btn { width: 100%; margin-top: 22px; }
+.pchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.pchip { display: inline-flex; align-items: center; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 14px; font-weight: 600; }
+.pchip button { border: 0; background: none; color: var(--muted); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; }
+.habits { list-style: none; padding: 0; margin: 4px 0; display: flex; flex-direction: column; gap: 6px; }
+.habits li { display: flex; align-items: center; gap: 6px; background: var(--paper); border-radius: 12px; padding: 4px 4px 4px 12px; font-size: 14px; }
+.habits li span { flex: 1; }
