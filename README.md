@@ -1,40 +1,66 @@
-# Spazio personale — PWA v0.1
+# Spazio personale — v2.0
 
-Prima versione installabile dell'app personale.
+Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
-## Cosa funziona già
-- Navigazione tra Oggi, Impegni, Interessi, Progetti e Assistente.
-- Creazione ed eliminazione di promemoria, interessi e progetti.
-- Salvataggio locale sul dispositivo tramite `localStorage`.
-- Esportazione dei dati personali in JSON.
-- Struttura PWA con manifest e service worker per uso offline dopo il primo caricamento.
-- Sezione Assistente AI completa a livello di interfaccia: conversazione, prompt suggeriti, comandi, configurazione, voce e accesso ai dati. Le azioni AI sono volutamente non operative e segnalate come non collegate.
+**Indirizzo:** https://edoardobassani.github.io/Spazio-personale/
 
-## Installazione sul Samsung
-La PWA deve essere pubblicata su un indirizzo HTTPS (ad esempio GitHub Pages).
+## Cosa funziona davvero
 
-1. Crea un repository GitHub, ad esempio `spazio-personale`.
-2. Carica tutti i file contenuti in questa cartella nella radice del repository.
-3. In GitHub apri **Settings → Pages**.
-4. Seleziona la pubblicazione dal branch principale e dalla cartella `/ (root)`.
-5. Attendi la pubblicazione e apri l'indirizzo HTTPS sul Samsung con Chrome.
-6. Dal menu di Chrome scegli **Installa app** oppure **Aggiungi a schermata Home**.
+**Oggi**
+- Data, saluto e riepilogo della giornata.
+- Impegni di oggi, scadenze passate non completate, prossimi 7 giorni.
+- Promemoria attivi: un impegno compare in "Da ricordare" quando inizia il suo anticipo (es. il giorno prima).
+- Nei giorni con pochi impegni: al massimo due proposte per il tempo libero, scelte con regole semplici dai tuoi progetti e interessi. Sono segnate come "Suggerimento" e hanno un aspetto diverso dai tuoi impegni.
 
-Puoi anche testarla in locale con un server statico; l'installazione PWA e il service worker richiedono localhost o HTTPS.
+**Impegni**
+- Tre tipi: appuntamento, attività (si può spuntare), scadenza (si può spuntare).
+- Titolo, data, ora di inizio e fine, luogo, categoria, note.
+- Ripetizioni: ogni giorno, settimana, mese o anno, ogni N, con data di fine facoltativa.
+- Promemoria per impegno, con anticipo predefinito diverso per ogni tipo (modificabile nelle impostazioni).
+- Viste giorno, settimana e mese.
+- Inserimento rapido: frasi come «dentista il 20 novembre alle 15» o «chiamare il commercialista venerdì» vengono interpretate e mostrate in un modulo da confermare.
+- Dettatura vocale nella barra di inserimento rapido (Chrome su Android).
 
-## Architettura prevista per l'AI
-L'interfaccia non chiama direttamente alcun modello. In una fase successiva:
-- aggiungere un modulo `ai-client` indipendente dal fornitore;
-- collegarlo a un backend/proxy sicuro;
-- conservare le chiavi API esclusivamente lato server;
-- definire permessi espliciti per il contesto personale condiviso con il modello;
-- integrare input vocale, sintesi vocale, strumenti/azioni e conferma prima delle azioni sensibili.
+**Progetti**
+- Nome, obiettivo, descrizione, scadenza, note.
+- Passaggi da spuntare, con barra di avanzamento e "prossimo passo" visibile.
+- Stati: attivo, in pausa, completato, archiviato.
+- Se un progetto è fermo da almeno due settimane, la schermata Oggi può proporre di riprenderlo. Con "Non ora" la proposta sparisce per due settimane. Nessuna serie, nessun punteggio.
 
-Non inserire mai chiavi API in `app.js` o in altri file pubblici.
+**Interessi**
+- Interessi stabili e curiosità del momento.
+- Pausa e ripresa, note, modifica ed eliminazione.
 
-## Limiti attuali
-- I dati sono salvati solo nel browser/dispositivo: cancellare i dati del sito può eliminarli. Esporta periodicamente una copia.
-- Nessuna sincronizzazione cloud o backup crittografato.
-- Nessuna notifica programmata.
-- Nessun assistente AI collegato, nessun riconoscimento o generazione vocale.
-- Il font esterno è caricato da Google Fonts; il resto dell'app è disponibile offline dopo il primo caricamento.
+**Dati**
+- Tutto è salvato solo sul dispositivo.
+- Backup scaricabile in un file e ripristino da file (Impostazioni).
+- Protezione dei dati dalla pulizia automatica del browser.
+- I dati della versione 0.1 vengono importati da soli al primo avvio e la loro copia originale non viene cancellata.
+- Funziona anche senza connessione dopo la prima apertura.
+
+## Cosa non c'è ancora
+
+- **Notifiche sul telefono ad app chiusa.** I promemoria compaiono quando apri l'app. Per notifiche affidabili su Android serve un piccolo servizio esterno (fase 3).
+- **Assistente AI.** La sezione indica chiaramente che non è collegato (fase 4).
+- **Scoperta di contenuti** (articoli, podcast, video): richiede l'AI.
+- **Risposte lette ad alta voce** (fase 5).
+- **Sincronizzazione tra dispositivi**: per passare a un altro dispositivo usa backup e ripristino (fase 6).
+
+## Struttura dei file
+
+| File | Contenuto |
+|---|---|
+| `index.html` | Struttura della pagina e barra di navigazione |
+| `styles.css` | Aspetto, anche in tema scuro |
+| `js/app.js` | Avvio, navigazione e gestione dei tocchi |
+| `js/views.js` | Le schermate e i pannelli di modifica |
+| `js/store.js` | Salvataggio dei dati, importazione dalla v0.1, backup |
+| `js/dates.js` | Calcoli su date e ripetizioni |
+| `js/parse.js` | Interpretazione delle frasi dell'inserimento rapido |
+| `sw.js` | Funzionamento offline |
+
+Non inserire mai chiavi API in questi file: sono pubblici.
+
+## Aggiornamenti
+
+Ogni modifica caricata su GitHub viene pubblicata in un paio di minuti. Se il telefono mostra ancora la versione precedente, chiudi e riapri l'app.

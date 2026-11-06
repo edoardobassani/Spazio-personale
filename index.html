@@ -3,174 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101b19">
-  <meta name="description" content="Il tuo spazio personale per impegni, interessi, progetti e idee.">
+  <meta name="theme-color" content="#f5f6f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111715" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Il tuo spazio personale per impegni, progetti e interessi.">
+  <title>Spazio personale</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css">
-  <title>Spazio personale</title>
+  <script>
+    // Se qualcosa si rompe, lo mostro a schermo invece di lasciare l'app muta
+    window.addEventListener('error', function (e) {
+      var b = document.getElementById('boot-error');
+      if (!b) return;
+      b.hidden = false;
+      b.querySelector('code').textContent = (e.message || 'Errore sconosciuto') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '');
+    });
+  </script>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Vai alla home">
-        <span class="brand-mark">✳</span><span>spazio<span class="brand-light">.</span></span>
-      </a>
-      <div class="top-actions">
-        <span class="offline-indicator"><i></i> <span id="connection-label">Pronto</span></span>
-        <button class="avatar" id="open-settings" aria-label="Impostazioni">E</button>
-      </div>
+  <div class="app">
+    <header class="top">
+      <a class="brand" href="#oggi"><img src="icon.svg" alt="" width="28" height="28">Spazio</a>
+      <button class="icon-btn" data-action="open-settings" aria-label="Impostazioni">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+      </button>
     </header>
 
-    <main>
-      <section class="view active" id="view-home">
-        <div class="greeting-row">
-          <div><p class="eyebrow" id="today-label">IL TUO SPAZIO PERSONALE</p><h1>Buongiorno.</h1><p class="subtle">Facciamo spazio alle cose che contano.</p></div>
-          <div class="date-chip" id="date-chip"></div>
-        </div>
-        <div class="hero-card">
-          <div class="hero-top"><span class="eyebrow light">LA TUA GIORNATA</span><span class="live-dot"></span></div>
-          <h2 id="day-headline">Una giornata da costruire.</h2>
-          <p id="day-copy">Aggiungi un impegno o scegli un'idea: il resto può aspettare.</p>
-          <div class="hero-bottom"><span id="today-count">Nessun impegno registrato</span><button class="text-button light-button" data-go="agenda">Apri agenda <span>↗</span></button></div>
-        </div>
+    <div id="boot-error" class="boot-error" hidden>
+      <strong>Qualcosa non ha funzionato.</strong>
+      <p>Prova a chiudere e riaprire l'app. Se il problema resta, comunica questo messaggio:</p>
+      <code></code>
+    </div>
+    <noscript><div class="boot-error"><strong>Serve JavaScript</strong><p>Attiva JavaScript nel browser per usare l'app.</p></div></noscript>
 
-        <div class="section-heading"><div><p class="eyebrow">IN PRIMO PIANO</p><h2>Oggi, con calma</h2></div><span class="tiny-pill">PANORAMICA</span></div>
-        <div class="dashboard-grid">
-          <article class="surface card-appointments">
-            <div class="card-title"><span class="icon-tile">▦</span><span class="card-kicker">DA RICORDARE</span><button class="more" data-go="agenda">···</button></div>
-            <div id="home-reminders" class="empty-state"><strong>Qui trovi i tuoi promemoria.</strong><span>Per ora la mente può riposare.</span></div>
-            <button class="inline-link" data-go="agenda">Gestisci impegni <span>→</span></button>
-          </article>
-          <article class="surface card-idea">
-            <div class="card-title"><span class="icon-tile warm">✧</span><span class="card-kicker">UN'IDEA PER TE</span><span class="ai-mini">AI · PREVISTO</span></div>
-            <div class="idea-illustration">☀</div>
-            <h3>Lascia un po' di spazio all'imprevisto.</h3>
-            <p>In futuro l'assistente ti proporrà attività in base al tempo libero, ai tuoi interessi e a ciò che ti va di fare.</p>
-            <button class="inline-link" data-go="assistant">Scopri l'assistente <span>→</span></button>
-          </article>
-        </div>
+    <main id="main"><p class="loading">Caricamento…</p></main>
 
-        <div class="section-heading"><div><p class="eyebrow">IL FILO DELLE TUE CURIOSITÀ</p><h2>Interessi in movimento</h2></div><button class="text-button" data-go="interests">Vedi tutti →</button></div>
-        <div class="interest-strip" id="home-interests">
-          <span class="interest-chip">Viticoltura</span><span class="interest-chip">Tecnologia</span><span class="interest-chip">Storia</span><span class="interest-chip">Geopolitica</span>
-        </div>
-
-        <div class="assistant-banner">
-          <div class="assistant-orb">✳</div><div class="assistant-banner-copy"><span class="eyebrow">IL TUO ASSISTENTE</span><strong>Un posto dove mettere a fuoco le idee.</strong><span>Chat, voce, suggerimenti e azioni: pronti da collegare.</span></div>
-          <button class="round-arrow" data-go="assistant" aria-label="Apri assistente">↗</button>
-        </div>
-      </section>
-
-      <section class="view" id="view-agenda">
-        <div class="page-intro"><p class="eyebrow">ORGANIZZAZIONE PERSONALE</p><h1>Impegni.</h1><p class="subtle">Una memoria esterna, senza dover tenere tutto a mente.</p></div>
-        <div class="surface form-card">
-          <div class="form-heading"><span class="icon-tile">＋</span><div><h3>Nuovo promemoria</h3><p>Appuntamenti, scadenze o cose da fare.</p></div></div>
-          <form id="reminder-form">
-            <label for="reminder-title">Che cosa devi ricordare?</label><input id="reminder-title" maxlength="100" placeholder="Es. Chiamare il dentista" required>
-            <div class="form-row"><div><label for="reminder-date">Data</label><input id="reminder-date" type="date"></div><div><label for="reminder-time">Ora (facoltativa)</label><input id="reminder-time" type="time"></div></div>
-            <button class="primary-button" type="submit">Aggiungi promemoria <span>＋</span></button>
-          </form>
-        </div>
-        <div class="section-heading compact"><div><p class="eyebrow">LA TUA LISTA</p><h2>Da non dimenticare</h2></div><span class="tiny-pill" id="reminder-total">0 ELEMENTI</span></div>
-        <div id="reminder-list" class="stack-list"></div>
-        <p class="footnote">I promemoria vengono salvati su questo dispositivo. Le notifiche automatiche e la sincronizzazione saranno aggiunte in una fase successiva.</p>
-      </section>
-
-      <section class="view" id="view-interests">
-        <div class="page-intro"><p class="eyebrow">CURIOSITÀ PERSONALI</p><h1>Interessi.</h1><p class="subtle">Un profilo che cresce insieme a te, senza trasformarsi in un'etichetta.</p></div>
-        <div class="surface form-card">
-          <h3>Hai scoperto qualcosa di nuovo?</h3><p class="form-desc">Aggiungi anche un interesse nato fuori da questa app.</p>
-          <form id="interest-form" class="inline-form"><input id="interest-name" maxlength="55" placeholder="Es. fotografia analogica" required><button class="primary-button square" type="submit">＋</button></form>
-        </div>
-        <div class="section-heading compact"><div><p class="eyebrow">IL TUO PROFILO</p><h2>Argomenti che ti incuriosiscono</h2></div></div>
-        <div id="interest-list" class="interest-grid"></div>
-        <div class="note-card"><span class="note-icon">✳</span><div><strong>Un profilo, non una gabbia.</strong><p>L'assistente potrà imparare dalle tue scelte e distinguere curiosità momentanee da interessi ricorrenti. Potrai sempre correggerlo o aggiungere qualcosa manualmente.</p></div></div>
-      </section>
-
-      <section class="view" id="view-projects">
-        <div class="page-intro"><p class="eyebrow">IDEE DA COLTIVARE</p><h1>Progetti.</h1><p class="subtle">Anche le passioni che vanno in pausa meritano un posto dove tornare.</p></div>
-        <div class="surface form-card">
-          <h3>Metti da parte un'idea</h3><p class="form-desc">Non serve decidere quando portarla avanti.</p>
-          <form id="project-form" class="inline-form"><input id="project-name" maxlength="75" placeholder="Es. Approfondire la fotografia" required><button class="primary-button square" type="submit">＋</button></form>
-        </div>
-        <div id="project-list" class="stack-list"></div>
-      </section>
-
-      <section class="view" id="view-assistant">
-        <div class="assistant-header">
-          <div><p class="eyebrow">IL TUO COMPAGNO DIGITALE</p><h1>Assistente.</h1><p class="subtle">Un'interfaccia pronta. Il motore AI arriverà più avanti.</p></div>
-          <div class="assistant-orb large">✳</div>
-        </div>
-        <div class="connection-card">
-          <div class="connection-icon">⌁</div><div class="connection-copy"><strong>Assistente non ancora collegato</strong><span>Questa sezione è predisposta per integrare un modello AI, ma al momento non invia messaggi né esegue comandi.</span></div><span class="status-pill">IN ATTESA</span>
-        </div>
-
-        <div class="assistant-tabs" role="tablist" aria-label="Funzioni assistente">
-          <button class="assistant-tab active" data-assistant-tab="chat">Conversazione</button>
-          <button class="assistant-tab" data-assistant-tab="actions">Comandi</button>
-          <button class="assistant-tab" data-assistant-tab="settings">Configurazione</button>
-        </div>
-
-        <div class="assistant-panel active" id="assistant-chat">
-          <div class="chat-welcome"><div class="chat-orb">✳</div><span class="eyebrow">SPAZIO DI CONVERSAZIONE</span><h2>Da dove vuoi iniziare?</h2><p>Quando collegheremo l'AI potrai parlare liberamente, chiedere consigli e trasformare le conversazioni in azioni.</p></div>
-          <div class="suggestion-label">ESEMPI DI RICHIESTE</div>
-          <div class="prompt-grid">
-            <button class="prompt-card ai-placeholder" data-feature="Organizzare la mia giornata"><span>☼</span><strong>Organizza la mia giornata</strong><small>Impegni, priorità e tempo libero</small><i>Non ancora disponibile</i></button>
-            <button class="prompt-card ai-placeholder" data-feature="Ricordami un appuntamento"><span>◷</span><strong>Ricordami qualcosa</strong><small>Crea un promemoria con la voce</small><i>Non ancora disponibile</i></button>
-            <button class="prompt-card ai-placeholder" data-feature="Suggeriscimi qualcosa da fare"><span>✧</span><strong>Suggeriscimi qualcosa</strong><small>Idee adatte al momento</small><i>Non ancora disponibile</i></button>
-            <button class="prompt-card ai-placeholder" data-feature="Aiutami ad approfondire un interesse"><span>⌕</span><strong>Approfondisci un tema</strong><small>Percorsi, fonti ed esperienze</small><i>Non ancora disponibile</i></button>
-          </div>
-          <div class="composer">
-            <div class="composer-tools"><button class="tool-button ai-placeholder" data-feature="Input vocale" aria-label="Dettatura vocale">♩</button><button class="tool-button ai-placeholder" data-feature="Allegati" aria-label="Allega un file">＋</button><span class="composer-hint">Le funzioni AI saranno attivate in seguito</span></div>
-            <textarea id="chat-input" rows="2" placeholder="Scrivi qui un messaggio..." disabled aria-label="Messaggio per l'assistente"></textarea>
-            <div class="composer-bottom"><span>Testo · voce in futuro</span><button class="send-button" disabled aria-label="Invia messaggio">↑</button></div>
-          </div>
-          <p class="footnote centered">La conversazione sarà collegata ai tuoi dati solo secondo i permessi che sceglierai.</p>
-        </div>
-
-        <div class="assistant-panel" id="assistant-actions">
-          <div class="section-heading compact"><div><p class="eyebrow">AZIONI RAPIDE</p><h2>Cosa potrà fare</h2></div></div>
-          <div class="action-list">
-            <button class="action-row ai-placeholder" data-feature="Creare un promemoria"><span class="action-icon">◷</span><span><strong>Crea un promemoria</strong><small>Da testo o comando vocale</small></span><b>↗</b></button>
-            <button class="action-row ai-placeholder" data-feature="Pianificare la giornata"><span class="action-icon">▦</span><span><strong>Rivedi la giornata</strong><small>Riepilogo e priorità dinamiche</small></span><b>↗</b></button>
-            <button class="action-row ai-placeholder" data-feature="Suggerire attività"><span class="action-icon">☀</span><span><strong>Trova un'attività</strong><small>Tempo, luogo, interessi e budget</small></span><b>↗</b></button>
-            <button class="action-row ai-placeholder" data-feature="Riprendere un progetto"><span class="action-icon">◇</span><span><strong>Riprendi un progetto</strong><small>Ritrova il punto in cui eri rimasto</small></span><b>↗</b></button>
-            <button class="action-row ai-placeholder" data-feature="Scoprire nuovi contenuti"><span class="action-icon">✧</span><span><strong>Scopri qualcosa di nuovo</strong><small>Contenuti e percorsi di approfondimento</small></span><b>↗</b></button>
-          </div>
-        </div>
-
-        <div class="assistant-panel" id="assistant-settings">
-          <div class="section-heading compact"><div><p class="eyebrow">PREDISPOSIZIONE TECNICA</p><h2>Impostazioni AI</h2></div></div>
-          <div class="surface settings-card">
-            <div class="setting-row"><div><strong>Fornitore AI</strong><small>Selezioneremo il modello in una fase successiva.</small></div><span class="setting-value">Da scegliere</span></div>
-            <div class="setting-row"><div><strong>Modello</strong><small>Architettura predisposta per modelli intercambiabili.</small></div><span class="setting-value">Non collegato</span></div>
-            <div class="setting-row"><div><strong>Risposte vocali</strong><small>Potrai leggere o ascoltare le risposte.</small></div><span class="setting-value">In programma</span></div>
-            <div class="setting-row"><div><strong>Input vocale</strong><small>Comandi rapidi e conversazione libera.</small></div><span class="setting-value">In programma</span></div>
-            <div class="setting-row"><div><strong>Accesso ai dati personali</strong><small>Permessi separati per agenda, interessi e progetti.</small></div><span class="setting-value">Da configurare</span></div>
-          </div>
-          <div class="note-card"><span class="note-icon">⌑</span><div><strong>Privacy e controllo</strong><p>Il collegamento AI sarà progettato tramite un livello intermedio: le chiavi API non saranno inserite nel codice pubblico dell'app e il modello riceverà soltanto i dati necessari.</p></div></div>
-        </div>
-      </section>
-    </main>
-
-    <nav class="bottom-nav" aria-label="Navigazione principale">
-      <button class="nav-item active" data-view="home"><span>⌂</span><small>Oggi</small></button>
-      <button class="nav-item" data-view="agenda"><span>▦</span><small>Impegni</small></button>
-      <button class="nav-item" data-view="interests"><span>✧</span><small>Interessi</small></button>
-      <button class="nav-item" data-view="projects"><span>◇</span><small>Progetti</small></button>
-      <button class="nav-item assistant-nav" data-view="assistant"><span>✳</span><small>Assistente</small></button>
+    <nav class="tabs" aria-label="Sezioni">
+      <a href="#oggi" data-route="oggi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2.5 12h2M19.5 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Oggi</span></a>
+      <a href="#impegni" data-route="impegni"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Impegni</span></a>
+      <a href="#interessi" data-route="interessi"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M15.2 8.8l-1.9 4.5-4.5 1.9 1.9-4.5z"/></svg><span>Interessi</span></a>
+      <a href="#progetti" data-route="progetti"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l8.5 4.7L12 13 3.5 8.2z"/><path d="M3.5 12.3L12 17l8.5-4.7"/><path d="M3.5 16.2L12 21l8.5-4.8"/></svg><span>Progetti</span></a>
+      <a href="#assistente" data-route="assistente"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2-5.2-1.8 5.2-1.8z"/><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg><span>Assistente</span></a>
     </nav>
   </div>
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <dialog id="settings-dialog" class="settings-dialog">
-    <div class="dialog-head"><div><p class="eyebrow">IL TUO SPAZIO</p><h2>Impostazioni</h2></div><button class="close-button" id="close-settings">×</button></div>
-    <div class="setting-row"><div><strong>Dati su questo dispositivo</strong><small>Promemoria, interessi e progetti sono salvati localmente.</small></div><span class="status-pill">ATTIVO</span></div>
-    <div class="setting-row"><div><strong>Esporta i miei dati</strong><small>Scarica una copia in formato JSON.</small></div><button class="small-button" id="export-data">Esporta</button></div>
-    <div class="setting-row"><div><strong>Installazione</strong><small>Aggiungi l'app alla schermata Home dal browser.</small></div><span class="setting-value">PWA</span></div>
-    <p class="footnote">La sincronizzazione privata e il backup crittografato saranno progettati prima di introdurre un account o un servizio cloud.</p>
-  </dialog>
-  <script src="app.js"></script>
+  <dialog id="sheet" class="sheet" aria-modal="true"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
