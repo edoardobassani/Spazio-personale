@@ -404,3 +404,10 @@ mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: in
 .sources a { font-size: 13px; background: var(--bg); border-radius: 999px; padding: 5px 10px; text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gsearch { width: 100%; border: 0; height: 64px; margin-top: 6px; border-radius: 10px; background: transparent; }
 .typing-status { margin-left: 8px; font-size: 13px; color: var(--muted); align-self: center; }
+
+/* Scelta del fornitore AI */
+.prov-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.prov-pick button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0 14px; min-height: 40px; font-weight: 650; font-size: 14.5px; color: var(--ink2); }
+.prov-pick button.on { background: var(--green); border-color: var(--green); color: var(--paper); }
+.prov-price { margin-top: 8px; }
+.prov-badge { align-self: center; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--line); border-radius: 999px; padding: 3px 9px; margin-right: 2px; }

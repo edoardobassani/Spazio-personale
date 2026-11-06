@@ -1,10 +1,10 @@
 // Tempo libero, proposte, feedback e quello che l'app impara dalle tue scelte.
 // Tutto è calcolato dai tuoi dati e si può vedere, correggere e cancellare dal profilo.
-import { state, commit, uid } from './store.js?v=2.4.0';
-import * as D from './dates.js?v=2.4.0';
-import { esc, icon, toast, openSheet } from './ui.js?v=2.4.0';
-import { items, openEventSheet, openSettings } from './views.js?v=2.4.0';
-import { askJSON, isConnected } from './ai/assistant.js?v=2.4.0';
+import { state, commit, uid } from './store.js?v=2.5.0';
+import * as D from './dates.js?v=2.5.0';
+import { esc, icon, toast, openSheet } from './ui.js?v=2.5.0';
+import { items, openEventSheet, openSettings } from './views.js?v=2.5.0';
+import { askJSON, isConnected } from './ai/assistant.js?v=2.5.0';
 
 const L = () => state.settings.learning;
 const ui = { day: '', busy: false };

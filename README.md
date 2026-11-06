@@ -1,4 +1,4 @@
-# Spazio personale — v2.4
+# Spazio personale — v2.5
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -41,7 +41,8 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 - Tutto è visibile: puoi far dimenticare una singola cosa, cancellare tutto o mettere in pausa l'apprendimento.
 - Le proposte e l'assistente lo usano come indicazione, se gli dai il permesso.
 
-**Assistente (Google Gemini, piano gratuito)**
+**Assistente AI (Gemini, OpenRouter, Claude oppure OpenAI)**
+- Si collega il fornitore che si preferisce, anche più di uno, e si passa dall'uno all'altro dalle impostazioni dell'assistente. Ogni fornitore ha la sua chiave e il suo modello.
 - Conversazione scritta o dettata, con lettura facoltativa delle risposte ad alta voce (voce del telefono).
 - Legge agenda, progetti e interessi, solo se gli dai il permesso. Le note personali sono escluse se non le attivi.
 - Può preparare impegni, modifiche, progetti con passaggi e interessi: compaiono come **proposte** da confermare o annullare. Nulla viene salvato senza il tuo tocco.
@@ -64,7 +65,7 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 
 - **Notifiche sul telefono ad app chiusa.** I promemoria compaiono quando apri l'app. Per notifiche affidabili su Android serve un piccolo servizio esterno (fase 3).
 - **Notizie ed eventi aggiornati con il piano gratuito**: Wikipedia non li contiene; serve la ricerca Google (account con fatturazione).
-- **Altri fornitori AI**: la struttura li prevede (`js/ai/`), per ora c'è solo Gemini.
+- **Groq e Mistral diretti**: bloccano le richieste dal browser; Mistral è raggiungibile tramite OpenRouter.
 - **Sincronizzazione tra dispositivi**: per passare a un altro dispositivo usa backup e ripristino (fase 6).
 
 ## Struttura dei file
@@ -80,7 +81,10 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 | `js/parse.js` | Interpretazione delle frasi dell'inserimento rapido |
 | `js/learn.js` | Tempo libero, proposte, feedback, profilo appreso |
 | `js/ai/assistant.js` | Conversazione, proposte, voce, impostazioni dell'assistente |
-| `js/ai/gemini.js` | Collegamento a Google Gemini (sostituibile con altri fornitori) |
+| `js/ai/providers.js` | Elenco dei fornitori AI e istruzioni per collegarli |
+| `js/ai/gemini.js` | Collegamento a Google Gemini |
+| `js/ai/openai.js` | Collegamento a OpenAI e OpenRouter |
+| `js/ai/anthropic.js` | Collegamento a Claude (Anthropic) |
 | `js/ai/tools.js` | Cosa l'assistente può leggere e proporre |
 | `js/ai/search.js` | Ricerca sul web (Google o Wikipedia) |
 | `sw.js` | Funzionamento offline |

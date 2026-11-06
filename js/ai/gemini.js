@@ -77,7 +77,12 @@ function schema(s) {
 function toContents(history) {
   return history.map(h => {
     if (h.role === 'user') return { role: 'user', parts: [{ text: h.text }] };
-    if (h.role === 'model') return h.raw; // conservato così com'è (contiene anche le "firme" del ragionamento)
+    if (h.role === 'model') {
+      // Risposta di Gemini conservata così com'è (contiene anche le "firme" del ragionamento)
+      if (h.raw && (!h.provider || h.provider === 'gemini')) return h.raw;
+      const parts = [...(h.text ? [{ text: h.text }] : []), ...(h.calls || []).map(c => ({ functionCall: { name: c.name, args: c.args || {} } }))];
+      return parts.length ? { role: 'model', parts } : null;
+    }
     if (h.role === 'tool') {
       return {
         role: 'user',

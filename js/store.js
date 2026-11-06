@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.4.0';
+import { todayISO } from './dates.js?v=2.5.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -17,18 +17,34 @@ export const onChange = fn => listeners.push(fn);
 // Impostazioni dell'assistente (la chiave API NON sta qui: resta a parte e non finisce nei backup)
 export function defaultAI() {
   return {
-    provider: 'gemini', model: '', models: [], speak: false, about: '',
+    provider: 'gemini', byProvider: {}, speak: false, about: '',
     perms: { events: true, projects: true, interests: true, notes: false, learning: true, web: true },
     web: { google: 'unknown', checkedAt: '', detail: '' },
   };
 }
 
+const AI_PROVIDERS = ['gemini', 'openrouter', 'anthropic', 'openai'];
+function normByProvider(a) {
+  const src = a.byProvider && typeof a.byProvider === 'object' ? { ...a.byProvider } : {};
+  // versioni precedenti: un solo fornitore (Gemini) con model/models in cima
+  if (!src.gemini && (a.model || (Array.isArray(a.models) && a.models.length))) src.gemini = { model: a.model, models: a.models };
+  const out = {};
+  for (const id of AI_PROVIDERS) {
+    const c = src[id] || {};
+    out[id] = {
+      model: typeof c.model === 'string' ? c.model : '',
+      models: Array.isArray(c.models) ? c.models.filter(m => m && m.id).map(m => ({ id: str(m.id), label: str(m.label || m.id) })).slice(0, 60) : [],
+    };
+  }
+  return out;
+}
+
 function normAI(a = {}) {
   const d = defaultAI();
   return {
-    provider: 'gemini',
-    model: typeof a.model === 'string' ? a.model : '',
-    models: Array.isArray(a.models) ? a.models.filter(m => m && m.id).slice(0, 40) : [],
+    provider: AI_PROVIDERS.includes(a.provider) ? a.provider : 'gemini',
+    // modello scelto ed elenco dei modelli, separati per fornitore
+    byProvider: normByProvider(a),
     speak: !!a.speak,
     about: str(a.about).slice(0, 2000),
     perms: Object.fromEntries(Object.keys(d.perms).map(k => [k, a.perms && typeof a.perms[k] === 'boolean' ? a.perms[k] : d.perms[k]])),

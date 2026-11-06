@@ -1,10 +1,10 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.4.0';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.4.0';
-import { parseQuick } from './parse.js?v=2.4.0';
-import * as V from './views.js?v=2.4.0';
-import * as AI from './ai/assistant.js?v=2.4.0';
-import * as LEARN from './learn.js?v=2.4.0';
+import { load, onChange } from './store.js?v=2.5.0';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.5.0';
+import { parseQuick } from './parse.js?v=2.5.0';
+import * as V from './views.js?v=2.5.0';
+import * as AI from './ai/assistant.js?v=2.5.0';
+import * as LEARN from './learn.js?v=2.5.0';
 
 const ROUTES = {
   oggi: V.renderToday,
@@ -101,7 +101,7 @@ document.addEventListener('submit', e => {
   e.preventDefault();
   if (f.dataset.form === 'quick' || f.dataset.form === 'ai-chat') stopDictation(); // Invia ferma la dettatura e usa il testo dettato
   if (f.dataset.form === 'quick') handleQuick(f.q.value);
-  if (f.dataset.form === 'ai-key') AI.connect(f.key.value);
+  if (f.dataset.form === 'ai-key') AI.connect(f.key.value, f.provider ? f.provider.value : undefined);
   if (f.dataset.form === 'ai-chat') { const t = f.q.value; f.q.value = ''; AI.send(t); }
   if (f.dataset.form === 'interest') {
     if (V.addInterest(f.name.value, f.querySelector('input[name=kind]:checked').value)) f.name.value = '';

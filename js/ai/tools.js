@@ -1,10 +1,10 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.4.0';
-import * as D from '../dates.js?v=2.4.0';
-import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.4.0';
-import { webSearch } from './search.js?v=2.4.0';
+import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.5.0';
+import * as D from '../dates.js?v=2.5.0';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.5.0';
+import { webSearch } from './search.js?v=2.5.0';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);

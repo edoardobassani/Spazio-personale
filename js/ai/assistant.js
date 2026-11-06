@@ -1,14 +1,15 @@
 // Assistente: conversazione, uso degli strumenti, proposte da confermare, voce.
-import { state, commit } from '../store.js?v=2.4.0';
-import * as D from '../dates.js?v=2.4.0';
-import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.4.0';
-import * as gemini from './gemini.js?v=2.4.0';
-import { toolDefs, runTool, applyProposal } from './tools.js?v=2.4.0';
-import { learnedSummary } from '../learn.js?v=2.4.0';
-import { googleStatus, resetGoogle } from './search.js?v=2.4.0';
+import { state, commit } from '../store.js?v=2.5.0';
+import * as D from '../dates.js?v=2.5.0';
+import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.5.0';
+import * as gemini from './gemini.js?v=2.5.0';
+import { PROVIDERS, PROVIDER_IDS } from './providers.js?v=2.5.0';
+import { toolDefs, runTool, applyProposal } from './tools.js?v=2.5.0';
+import { learnedSummary } from '../learn.js?v=2.5.0';
+import { googleStatus, resetGoogle } from './search.js?v=2.5.0';
 
-const PROVIDERS = { gemini };
-const KEY_STORE = 'spazio-personale-ai-key';
+const KEYS_STORE = 'spazio-personale-ai-keys';
+const OLD_KEY_STORE = 'spazio-personale-ai-key';
 const CHAT_STORE = 'spazio-personale-chat';
 const MAX_ROUNDS = 6;
 
@@ -16,10 +17,37 @@ let rerender = () => {};
 export const setRender = fn => { rerender = fn; };
 
 const ai = () => state.settings.ai;
-const provider = () => PROVIDERS[ai().provider] || gemini;
-export function getKey() { try { return localStorage.getItem(KEY_STORE) || ''; } catch (_) { return ''; } }
-function setKey(k) { try { if (k) localStorage.setItem(KEY_STORE, k); else localStorage.removeItem(KEY_STORE); } catch (_) { /* niente */ } }
-export const isConnected = () => !!getKey() && !!ai().model;
+const pid = () => (PROVIDERS[ai().provider] ? ai().provider : 'gemini');
+const provider = () => PROVIDERS[pid()].adapter;
+// Impostazioni del fornitore attivo (modello scelto ed elenco)
+function cfg(id = pid()) {
+  const a = ai();
+  if (!a.byProvider) a.byProvider = {};
+  if (!a.byProvider[id]) a.byProvider[id] = { model: '', models: [] };
+  return a.byProvider[id];
+}
+
+// Una chiave per fornitore, solo su questo dispositivo (mai nei backup)
+function readKeys() {
+  let keys = {};
+  try { keys = JSON.parse(localStorage.getItem(KEYS_STORE) || '{}') || {}; } catch (_) { keys = {}; }
+  try {
+    const old = localStorage.getItem(OLD_KEY_STORE);
+    if (old && !keys.gemini) { keys.gemini = old; localStorage.setItem(KEYS_STORE, JSON.stringify(keys)); }
+    if (old) localStorage.removeItem(OLD_KEY_STORE);
+  } catch (_) { /* niente */ }
+  return keys;
+}
+export function getKey(id = pid()) { return readKeys()[id] || ''; }
+function setKey(id, k) {
+  const keys = readKeys();
+  if (k) keys[id] = k; else delete keys[id];
+  try { localStorage.setItem(KEYS_STORE, JSON.stringify(keys)); } catch (_) { /* niente */ }
+}
+export const connectedProviders = () => PROVIDER_IDS.filter(id => getKey(id) && cfg(id).model);
+export const isConnected = () => !!getKey() && !!cfg().model;
+export const providerName = (id = pid()) => PROVIDERS[id].name;
+const ui = { setup: '' }; // fornitore scelto nella schermata di collegamento
 
 // ---------- Conversazione salvata sul dispositivo
 
@@ -80,19 +108,21 @@ ${ai().about.trim() ? `\nCosa l'utente ti ha detto di sé:\n${ai().about.trim()}
 // Prova il modello scelto; se non è gratuito o non esiste più, passa al successivo
 async function withModel(run) {
   const tried = new Set();
-  let model = ai().model;
+  let model = cfg().model;
   for (;;) {
     tried.add(model);
     try {
       const res = await run(model);
-      if (model !== ai().model) {
-        ai().model = model; commit();
+      if (model !== cfg().model) {
+        cfg().model = model; commit();
         chat.view.push({ role: 'info', text: `Il modello precedente non è disponibile gratuitamente: ora uso ${labelOf(model)}.` });
       }
       return res;
     } catch (e) {
       if (!(e.code === 'not-free' || e.code === 'model')) throw e;
-      const next = ai().models.map(m => m.id).find(id => !tried.has(id));
+      // Passo a un altro modello solo con Gemini (dove l'elenco è ordinato per gratuità)
+      const next = pid() === 'gemini' ? cfg().models.map(m => m.id).find(id => !tried.has(id)) : null;
+      if (!next && pid() !== 'gemini') throw e;
       if (!next) throw new gemini.AIError('Nessun modello gratuito disponibile per questa chiave in questo momento.', 'no-model');
       model = next;
     }
@@ -103,10 +133,10 @@ const generateWithFallback = req => withModel(model => provider().generate({ ...
 // Domanda con risposta strutturata (JSON), usata da altre parti dell'app
 export async function askJSON({ system, prompt, schema }) {
   const key = getKey();
-  if (!key || !ai().model) throw new gemini.AIError("L'assistente non è collegato.", 'key');
+  if (!key || !cfg().model) throw new gemini.AIError("L'assistente non è collegato.", 'key');
   return withModel(model => provider().generateJSON({ key, model, system, prompt, schema }));
 }
-const labelOf = id => (ai().models.find(m => m.id === id) || { label: id.replace('models/', '') }).label;
+const labelOf = id => (cfg().models.find(m => m.id === id) || { label: id.replace('models/', '') }).label;
 
 export async function send(text) {
   text = text.trim();
@@ -125,7 +155,7 @@ export async function send(text) {
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const res = await generateWithFallback({ key, system: systemPrompt(), history: chat.history, tools: toolDefs(ai().perms) });
-      chat.history.push({ role: 'model', raw: res.raw });
+      chat.history.push({ role: 'model', provider: pid(), text: res.text, calls: res.calls, raw: res.raw || undefined });
       if (!res.calls.length) {
         finalText = res.text || 'Non ho una risposta da darti, prova a riformulare.';
         const seen = new Set();
@@ -137,7 +167,8 @@ export async function send(text) {
       const results = [];
       for (const c of res.calls) {
         if (c.name === 'cerca_web') { chat.status = `Cerco sul web: ${String((c.args || {}).query || '').slice(0, 60)}`; rerender(); }
-        const out = await runTool(c.name, c.args, ai().perms, { key, model: ai().model });
+        // La ricerca Google passa sempre da una chiave Gemini, se ce n'è una
+        const out = await runTool(c.name, c.args, ai().perms, { key: getKey('gemini'), model: cfg('gemini').model });
         chat.status = '';
         if (out.proposal) chat.view.push({ role: 'proposal', proposal: out.proposal });
         if (out.sources) found.sources.push(...out.sources);
@@ -274,31 +305,37 @@ function message(m, i) {
 }
 
 function setupView() {
+  const sel = PROVIDERS[ui.setup] ? ui.setup : pid();
+  const p = PROVIDERS[sel];
   return `<section class="view">
-    <header class="page-head"><h1>Assistente</h1></header>
+    <header class="page-head"><h1>Assistente</h1>${connectedProviders().length ? `<button class="btn small ghost" data-action="ai-setup-cancel">Annulla</button>` : ''}</header>
     <div class="status-card"><span class="status-dot"></span>
-      <div><strong>Collega Google Gemini</strong>
-      <p>Si usa il piano gratuito di Google: non serve una carta di credito. Ci vogliono un paio di minuti.</p></div></div>
+      <div><strong>Collega un fornitore AI</strong>
+      <p>L'app funziona con diversi fornitori: scegli quello che preferisci, puoi cambiarlo quando vuoi.</p></div></div>
+    <div class="prov-pick">${PROVIDER_IDS.map(id => `<button class="${id === sel ? 'on' : ''}" data-action="ai-setup-pick" data-id="${id}">${esc(PROVIDERS[id].name)}${getKey(id) ? ' ✓' : ''}</button>`).join('')}</div>
+    <p class="hint prov-price">${esc(p.price)}</p>
     <ol class="setup">
-      <li>Apri <a href="${gemini.info.keyUrl}" target="_blank" rel="noopener">Google AI Studio</a> e accedi con il tuo account Google.</li>
-      <li>Tocca <strong>Create API key</strong> (Crea chiave API) e copia la chiave.</li>
+      <li>Apri <a href="${p.keyUrl}" target="_blank" rel="noopener">${esc(p.site)}</a>. ${p.steps[0]}</li>
+      <li>${p.steps[1]}</li>
       <li>Incollala qui sotto e tocca <strong>Collega</strong>.</li>
     </ol>
     <form class="key-form" data-form="ai-key">
+      <input type="hidden" name="provider" value="${sel}">
       <input name="key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla qui la chiave API" aria-label="Chiave API">
       <button class="btn primary">Collega</button>
     </form>
     <div class="info-card"><strong>Privacy</strong>
-      <p>La chiave resta solo su questo telefono e non finisce nei backup. Quando usi l'assistente, la tua domanda e i dati che servono per rispondere vengono inviati a Google. Con il piano gratuito Google può usare queste conversazioni per migliorare i suoi servizi, e alcune possono essere lette da revisori. Nelle impostazioni dell'assistente scegli tu cosa può vedere: per esempio le note personali sono escluse.</p></div>
+      <p>La chiave resta solo su questo telefono e non finisce nei backup. Quando usi l'assistente, la tua domanda e i dati che servono per rispondere vengono inviati al fornitore scelto. ${esc(p.privacy)} Nelle impostazioni dell'assistente scegli tu cosa può vedere: per esempio le note personali sono escluse.</p></div>
   </section>`;
 }
 
 export function renderAssistant() {
-  if (!getKey() || !ai().model) return setupView();
+  if (ui.setup || !isConnected()) return setupView();
   const msgs = chat.view.map(message).join('');
   return `<section class="view chat-view">
     <header class="page-head"><h1>Assistente</h1>
       <span class="head-actions">
+        <span class="prov-badge">${esc(providerName())}</span>
         ${chat.view.length ? `<button class="icon-btn" data-action="ai-new" aria-label="Nuova conversazione">${icon('plus')}</button>` : ''}
         <button class="icon-btn" data-action="ai-settings" aria-label="Impostazioni dell'assistente">${icon('sliders')}</button>
       </span></header>
@@ -325,23 +362,37 @@ export function afterRender() {
 
 // ---------- Collegamento e impostazioni
 
-export async function connect(key) {
+export async function connect(key, id = ui.setup || pid()) {
   key = key.trim();
+  if (!PROVIDERS[id]) id = 'gemini';
   if (!key) { toast('Incolla la chiave API'); return; }
   const btn = document.querySelector('[data-form=ai-key] button');
   if (btn) { btn.disabled = true; btn.textContent = 'Verifico…'; }
   try {
-    const models = await provider().listModels(key);
-    if (!models.length) throw new gemini.AIError('Questa chiave non dà accesso a nessun modello Flash di Gemini.', 'no-model');
-    setKey(key);
-    ai().models = models;
-    ai().model = models[0].id;
+    const models = await PROVIDERS[id].adapter.listModels(key);
+    if (!models.length) throw new gemini.AIError(`Questa chiave non dà accesso a nessun modello adatto di ${PROVIDERS[id].name}.`, 'no-model');
+    setKey(id, key);
+    cfg(id).models = models;
+    if (!models.some(m => m.id === cfg(id).model)) cfg(id).model = models[0].id;
+    const switching = ai().provider !== id;
+    ai().provider = id;
+    ui.setup = '';
+    if (switching) resetChat(); // le conversazioni non passano da un fornitore all'altro
     commit();
-    toast('Assistente collegato');
+    toast(`${PROVIDERS[id].name} collegato`);
   } catch (e) {
     toast(e.message, 'bad');
     if (btn) { btn.disabled = false; btn.textContent = 'Collega'; }
   }
+}
+
+function switchProvider(id) {
+  if (id === pid() || !getKey(id) || !cfg(id).model) return;
+  if (chat.view.length && !confirm('Cambiando fornitore la conversazione attuale ricomincia da capo. Continuare?')) return;
+  ai().provider = id;
+  resetChat();
+  commit();
+  toast(`Ora uso ${PROVIDERS[id].name}`);
 }
 
 export function openAISettings() {
@@ -350,10 +401,14 @@ export function openAISettings() {
   openSheet(`
     <div class="sheet-head"><h2>Impostazioni assistente</h2><button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
     <div class="form">
-      <label class="field"><span>Modello</span><select data-model>
-        ${a.models.map(m => `<option value="${esc(m.id)}"${m.id === a.model ? ' selected' : ''}>${esc(m.label)}</option>`).join('')}
+      <label class="field"><span>Fornitore</span><select data-provider>
+        ${connectedProviders().map(id => `<option value="${id}"${id === pid() ? ' selected' : ''}>${esc(PROVIDERS[id].name)}</option>`).join('')}
       </select></label>
-      <p class="hint">Di solito va bene quello scelto in automatico. Se un modello non è gratuito, l'app ne prova da sola un altro.</p>
+      <button type="button" class="btn small ghost" data-add-provider>${icon('plus', 'xs')} Collega un altro fornitore</button>
+      <label class="field"><span>Modello</span><select data-model>
+        ${cfg().models.map(m => `<option value="${esc(m.id)}"${m.id === cfg().model ? ' selected' : ''}>${esc(m.label)}</option>`).join('')}
+      </select></label>
+      <p class="hint">${pid() === 'gemini' ? "Di solito va bene quello scelto in automatico. Se un modello non è gratuito, l'app ne prova da sola un altro." : pid() === 'openrouter' ? 'I modelli segnati «gratis» non costano nulla ma hanno un limite di richieste al giorno.' : 'Il primo della lista è il più economico.'}</p>
       <button type="button" class="btn small ghost" data-refresh>Aggiorna l'elenco dei modelli</button>
     </div>
     <h3 class="sub">Cosa può vedere</h3>
@@ -365,8 +420,8 @@ export function openAISettings() {
       ${perm('learning', 'Preferenze apprese', 'Usare quello che l\'app ha imparato dalle tue scelte')}
       ${perm('web', 'Ricerca sul web', 'Cercare notizie, eventi, luoghi e contenuti (le ricerche vanno a Google o Wikipedia)')}
     </div>
-    <p class="hint web-status">${{ ok: 'Ricerca web: uso Google.', unavailable: 'Ricerca web: Google non è disponibile con questa chiave (di solito serve un account con fatturazione). Uso Wikipedia, che non ha notizie né eventi aggiornati.', unknown: 'Ricerca web: Google verrà provato alla prima ricerca; se non è disponibile, uso Wikipedia.' }[googleStatus()]}
-      ${googleStatus() === 'unavailable' ? '<button type="button" class="link" data-web-retry>Riprova Google</button>' : ''}</p>
+    <p class="hint web-status">${!getKey('gemini') ? 'Ricerca web: uso Wikipedia, che non ha notizie né eventi aggiornati. La ricerca Google richiede una chiave Gemini con fatturazione attiva.' : { ok: 'Ricerca web: uso Google.', unavailable: 'Ricerca web: Google non è disponibile con la chiave Gemini (di solito serve un account con fatturazione). Uso Wikipedia, che non ha notizie né eventi aggiornati.', unknown: 'Ricerca web: Google verrà provato alla prima ricerca; se non è disponibile, uso Wikipedia.' }[googleStatus()]}
+      ${getKey('gemini') && googleStatus() === 'unavailable' ? '<button type="button" class="link" data-web-retry>Riprova Google</button>' : ''}</p>
     <h3 class="sub">Su di te</h3>
     <p class="hint">Facoltativo. Quello che scrivi qui viene inviato all'assistente a ogni richiesta, per dargli il contesto (orari, lavoro, abitudini, preferenze).</p>
     <div class="form"><label class="field"><textarea data-about rows="5" maxlength="2000" placeholder="Es. Lavoro in un'azienda vitivinicola, mi sveglio alle 5:30 e vado a dormire verso le 22. Palestra tre volte a settimana, porto a spasso il cane.">${esc(a.about)}</textarea></label></div>
@@ -376,17 +431,19 @@ export function openAISettings() {
     </div>
     <div class="stack">
       <button class="btn" data-clear>${icon('plus', 'xs')} Nuova conversazione</button>
-      <button class="btn danger" data-disconnect>Scollega e rimuovi la chiave</button>
+      <button class="btn danger" data-disconnect>Scollega ${esc(providerName())} e rimuovi la chiave</button>
     </div>`, sheet => {
-    sheet.querySelector('[data-model]').addEventListener('change', e => { a.model = e.target.value; commit(); toast('Modello cambiato'); });
+    sheet.querySelector('[data-model]').addEventListener('change', e => { cfg().model = e.target.value; commit(); toast('Modello cambiato'); });
+    sheet.querySelector('[data-provider]').addEventListener('change', e => { switchProvider(e.target.value); openAISettings(); });
+    sheet.querySelector('[data-add-provider]').addEventListener('click', () => { ui.setup = PROVIDER_IDS.find(id => !getKey(id)) || PROVIDER_IDS.find(id => id !== pid()); closeSheet(); rerender(); });
     sheet.querySelectorAll('[data-perm]').forEach(el => el.addEventListener('change', () => { a.perms[el.dataset.perm] = el.checked; commit(); }));
     const about = sheet.querySelector('[data-about]');
     about.addEventListener('change', () => { a.about = about.value.trim(); commit(); toast('Salvato'); });
     sheet.querySelector('[data-speak]').addEventListener('change', e => { a.speak = e.target.checked; commit(); if (a.speak) speak('Va bene, leggerò le risposte.'); });
     sheet.querySelector('[data-refresh]').addEventListener('click', async () => {
       try {
-        a.models = await provider().listModels(getKey());
-        if (!a.models.some(m => m.id === a.model) && a.models[0]) a.model = a.models[0].id;
+        cfg().models = await provider().listModels(getKey());
+        if (!cfg().models.some(m => m.id === cfg().model) && cfg().models[0]) cfg().model = cfg().models[0].id;
         commit(); openAISettings(); toast('Elenco aggiornato');
       } catch (e) { toast(e.message, 'bad'); }
     });
@@ -394,8 +451,11 @@ export function openAISettings() {
     const wr = sheet.querySelector('[data-web-retry]');
     if (wr) wr.addEventListener('click', () => { resetGoogle(); openAISettings(); toast('Riproverò Google alla prossima ricerca'); });
     sheet.querySelector('[data-disconnect]').addEventListener('click', () => {
-      if (!confirm("Rimuovere la chiave? L'assistente smetterà di funzionare finché non la inserisci di nuovo.")) return;
-      setKey(''); a.model = ''; a.models = []; resetChat(); closeSheet(); commit();
+      if (!confirm(`Rimuovere la chiave di ${providerName()}?`)) return;
+      setKey(pid(), ''); cfg().model = ''; cfg().models = [];
+      const other = connectedProviders()[0];
+      if (other) ai().provider = other;
+      resetChat(); closeSheet(); commit();
     });
   });
 }
@@ -408,5 +468,7 @@ export const actions = {
   'ai-speak': el => { const m = chat.view[+el.dataset.i]; if (m) speak(m.text); },
   'ai-new': () => { if (confirm('Iniziare una nuova conversazione?')) { resetChat(); rerender(); } },
   'ai-settings': () => openAISettings(),
+  'ai-setup-pick': el => { ui.setup = el.dataset.id; rerender(); },
+  'ai-setup-cancel': () => { ui.setup = ''; rerender(); },
   'ai-voice': el => dictate(el.closest('form').q, el),
 };

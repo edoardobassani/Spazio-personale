@@ -2,8 +2,8 @@
 // 1) Google, tramite la ricerca integrata in Gemini, se la chiave lo consente
 //    (di solito serve un account Google con fatturazione attiva).
 // 2) Altrimenti Wikipedia in italiano: gratuita, ma senza notizie, eventi o orari attuali.
-import { state, commit } from '../store.js?v=2.4.0';
-import * as D from '../dates.js?v=2.4.0';
+import { state, commit } from '../store.js?v=2.5.0';
+import * as D from '../dates.js?v=2.5.0';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const RECHECK_DAYS = 7;
@@ -76,11 +76,11 @@ async function wikipedia(query) {
 }
 
 // Restituisce { response per il modello, sources e suggerimenti di ricerca per lo schermo }
-export async function webSearch({ query, purpose }, { key, model }) {
+export async function webSearch({ query, purpose }, { key, model } = {}) {
   query = String(query || '').trim().slice(0, 300);
   if (!query) return { response: { errore: 'Manca la ricerca da fare' } };
   let result = null, note = '';
-  if (googleStatus() !== 'unavailable') {
+  if (key && model && googleStatus() !== 'unavailable') {
     try {
       result = await google(query, key, model);
       mark('ok');
@@ -93,7 +93,8 @@ export async function webSearch({ query, purpose }, { key, model }) {
   if (!result) {
     try { result = await wikipedia(query); }
     catch (e) { return { response: { errore: 'Ricerca non riuscita: nessuna connessione o servizio non raggiungibile.' } }; }
-    if (googleStatus() === 'unavailable') note += 'La ricerca Google non è disponibile con questa chiave (piano gratuito): uso Wikipedia. ';
+    if (!key) note += 'Ricerca Google non configurata: uso Wikipedia. ';
+    else if (googleStatus() === 'unavailable') note += 'La ricerca Google non è disponibile con questa chiave (piano gratuito): uso Wikipedia. ';
     if (purpose === 'attualita' || purpose === 'luoghi_eventi') note += 'Wikipedia non contiene notizie, eventi, orari o prezzi aggiornati: dillo all\'utente e suggerisci di verificare. ';
   }
   return {
