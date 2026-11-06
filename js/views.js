@@ -1,7 +1,7 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js';
-import * as D from './dates.js';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.1.1';
+import * as D from './dates.js?v=2.1.1';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.1.1';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -626,7 +626,7 @@ export function openSettings() {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.1</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.1.1</p>`, sheet => {
     sheet.querySelectorAll('[data-lead]').forEach(el => el.addEventListener('change', () => {
       state.settings.reminders[el.dataset.lead] = el.value === '' ? null : +el.value;
       commit(); toast('Salvato');

@@ -1,9 +1,9 @@
 // Assistente: conversazione, uso degli strumenti, proposte da confermare, voce.
-import { state, commit } from '../store.js';
-import * as D from '../dates.js';
-import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js';
-import * as gemini from './gemini.js';
-import { toolDefs, runTool, applyProposal } from './tools.js';
+import { state, commit } from '../store.js?v=2.1.1';
+import * as D from '../dates.js?v=2.1.1';
+import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.1.1';
+import * as gemini from './gemini.js?v=2.1.1';
+import { toolDefs, runTool, applyProposal } from './tools.js?v=2.1.1';
 
 const PROVIDERS = { gemini };
 const KEY_STORE = 'spazio-personale-ai-key';

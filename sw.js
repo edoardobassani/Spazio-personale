@@ -1,12 +1,11 @@
 // Service worker: rende l'app disponibile anche senza connessione.
 // Strategia "prima la rete": se sei online scarichi sempre l'ultima versione,
 // se sei offline usi la copia salvata. Così un aggiornamento non resta bloccato in cache.
-const VERSION = '2.1.0';
+const VERSION = '2.1.1';
 const CACHE = `spazio-${VERSION}`;
 const CORE = [
-  './', './index.html', './styles.css', './manifest.webmanifest', './icon.svg', './icon-192.png',
-  './js/app.js', './js/store.js', './js/dates.js', './js/parse.js', './js/ui.js', './js/views.js',
-  './js/ai/assistant.js', './js/ai/gemini.js', './js/ai/tools.js',
+  './', './index.html', `./styles.css?v=${VERSION}`, './manifest.webmanifest', './icon.svg', './icon-192.png',
+  ...['app', 'store', 'dates', 'parse', 'ui', 'views', 'ai/assistant', 'ai/gemini', 'ai/tools'].map(f => `./js/${f}.js?v=${VERSION}`),
 ];
 
 self.addEventListener('install', event => {

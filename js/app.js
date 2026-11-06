@@ -1,9 +1,9 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js';
-import { toast, dictate, closeSheet } from './ui.js';
-import { parseQuick } from './parse.js';
-import * as V from './views.js';
-import * as AI from './ai/assistant.js';
+import { load, onChange } from './store.js?v=2.1.1';
+import { toast, dictate, closeSheet } from './ui.js?v=2.1.1';
+import { parseQuick } from './parse.js?v=2.1.1';
+import * as V from './views.js?v=2.1.1';
+import * as AI from './ai/assistant.js?v=2.1.1';
 
 const ROUTES = {
   oggi: V.renderToday,

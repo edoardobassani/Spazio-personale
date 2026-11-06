@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.1.1">
   <script>
     // Se qualcosa si rompe, lo mostro a schermo invece di lasciare l'app muta
     window.addEventListener('error', function (e) {
@@ -19,6 +19,13 @@
       b.hidden = false;
       b.querySelector('code').textContent = (e.message || 'Errore sconosciuto') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '');
     });
+    // Riparazione: rimuove le copie salvate dei file dell'app (NON i tuoi dati) e ricarica
+    function repairApp() {
+      var jobs = [];
+      if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+      if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+      Promise.all(jobs).catch(function () {}).then(function () { location.replace(location.pathname + '?r=' + Date.now()); });
+    }
   </script>
 </head>
 <body>
@@ -34,6 +41,7 @@
       <strong>Qualcosa non ha funzionato.</strong>
       <p>Prova a chiudere e riaprire l'app. Se il problema resta, comunica questo messaggio:</p>
       <code></code>
+      <button type="button" class="btn small" onclick="repairApp()">Ripara l'app</button>
     </div>
     <noscript><div class="boot-error"><strong>Serve JavaScript</strong><p>Attiva JavaScript nel browser per usare l'app.</p></div></noscript>
 
@@ -51,6 +59,6 @@
   <dialog id="sheet" class="sheet" aria-modal="true"></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=2.1.1"></script>
 </body>
 </html>
