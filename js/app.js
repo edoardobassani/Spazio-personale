@@ -1,9 +1,9 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.1.1';
-import { toast, dictate, closeSheet } from './ui.js?v=2.1.1';
-import { parseQuick } from './parse.js?v=2.1.1';
-import * as V from './views.js?v=2.1.1';
-import * as AI from './ai/assistant.js?v=2.1.1';
+import { load, onChange } from './store.js?v=2.1.2';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.1.2';
+import { parseQuick } from './parse.js?v=2.1.2';
+import * as V from './views.js?v=2.1.2';
+import * as AI from './ai/assistant.js?v=2.1.2';
 
 const ROUTES = {
   oggi: V.renderToday,
@@ -21,6 +21,7 @@ const route = () => {
 
 function render() {
   const r = route();
+  stopDictation(); // il testo dettato fin qui resta nel campo
   // Conserva quello che stavi scrivendo se la schermata si aggiorna
   const typing = [...main.querySelectorAll('[data-form] [name=q]')].map(el => [el.closest('[data-form]').dataset.form, el.value, el === document.activeElement]);
   main.innerHTML = ROUTES[r]();
@@ -35,6 +36,7 @@ AI.setRender(render);
 
 let lastRoute = null;
 window.addEventListener('hashchange', () => {
+  stopDictation();
   closeSheet();
   render();
   if (route() !== lastRoute) window.scrollTo(0, 0);
@@ -63,10 +65,7 @@ const actions = {
   'snooze-project': el => V.snooze('project', el.dataset.id),
   'snooze-interest': el => V.snooze('interest', el.dataset.id),
   ...AI.actions,
-  voice: el => {
-    const form = el.closest('form');
-    dictate(form.q, el, text => handleQuick(text));
-  },
+  voice: el => dictate(el.closest('form').q, el),
 };
 
 function localToday() {
@@ -97,6 +96,7 @@ document.addEventListener('submit', e => {
   const f = e.target.closest('[data-form]');
   if (!f) return;
   e.preventDefault();
+  if (f.dataset.form === 'quick' || f.dataset.form === 'ai-chat') stopDictation(); // Invia ferma la dettatura e usa il testo dettato
   if (f.dataset.form === 'quick') handleQuick(f.q.value);
   if (f.dataset.form === 'ai-key') AI.connect(f.key.value);
   if (f.dataset.form === 'ai-chat') { const t = f.q.value; f.q.value = ''; AI.send(t); }
@@ -142,7 +142,7 @@ document.addEventListener('visibilitychange', () => {
     if (!sheet.open) render();
   }
 });
-setInterval(() => { if (document.visibilityState === 'visible' && !sheet.open) render(); }, 5 * 60 * 1000);
+setInterval(() => { if (document.visibilityState === 'visible' && !sheet.open && !isDictating()) render(); }, 5 * 60 * 1000);
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service worker non registrato', err));

@@ -57,38 +57,92 @@ export function closeSheet() {
   if (d.open) d.close();
 }
 
-// Dettatura vocale (Chrome su Android usa il riconoscimento vocale di Google)
+// Dettatura vocale (Chrome su Android usa il riconoscimento vocale di Google).
+// Funziona "a mano libera": resta in ascolto anche durante le pause, finché
+// non tocchi Invia (che manda il testo) o di nuovo il microfono (che si ferma
+// e lascia il testo nel campo da correggere). Il telefono chiude da solo
+// l'ascolto dopo un po' di silenzio: in quel caso lo riavvio senza perdere niente.
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 export const voiceSupported = !!SR;
-let rec = null;
-export function dictate(input, button, onFinal) {
-  if (!SR) { toast('La dettatura non è disponibile su questo browser'); return; }
-  if (rec) { rec.stop(); return; }
-  rec = new SR();
-  rec.lang = 'it-IT';
-  rec.interimResults = true;
-  rec.maxAlternatives = 1;
-  let finalText = '';
-  button.classList.add('listening');
-  input.placeholder = 'Ti ascolto…';
-  rec.onresult = e => {
-    let text = '';
-    for (const r of e.results) text += r[0].transcript;
-    input.value = text;
-    if (e.results[e.results.length - 1].isFinal) finalText = text;
-  };
-  rec.onerror = e => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') toast('Serve il permesso per usare il microfono');
-    else if (e.error === 'no-speech') toast('Non ho sentito niente, riprova');
-    else if (e.error === 'network') toast('La dettatura richiede la connessione');
-    else if (e.error !== 'aborted') toast('Dettatura non riuscita, riprova');
-  };
-  rec.onend = () => {
-    button.classList.remove('listening');
-    input.placeholder = input.dataset.placeholder || '';
-    rec = null;
-    const t = (finalText || input.value).trim();
-    if (t && onFinal) onFinal(t);
-  };
-  try { rec.start(); } catch (err) { rec = null; button.classList.remove('listening'); toast('Dettatura non riuscita, riprova'); }
+let session = null;
+
+export const isDictating = () => !!session;
+
+export function stopDictation() {
+  if (!session) return '';
+  const s = session;
+  session = null;
+  s.active = false;
+  try { s.rec.abort(); } catch (_) { /* già fermo */ }
+  s.button.classList.remove('listening');
+  s.button.setAttribute('aria-label', 'Detta');
+  s.input.placeholder = s.input.dataset.placeholder || '';
+  s.input.value = s.text().trim();
+  return s.input.value;
 }
+
+export function dictate(input, button) {
+  if (!SR) { toast('La dettatura non è disponibile su questo browser'); return; }
+  if (session) {
+    const same = session.input === input;
+    stopDictation();
+    if (same) { input.focus(); return; } // secondo tocco sul microfono: mi fermo
+  }
+  const before = input.value.trim();
+  const s = {
+    input, button, active: true, committed: before ? before + ' ' : '', interim: '', lastFinal: '', restarts: 0,
+    text() { return (this.committed + this.interim).replace(/\s+/g, ' ').replace(/^\s/, ''); },
+  };
+  const join = (a, b) => (a && !/\s$/.test(a) ? a + ' ' : a) + b.trim();
+  const start = () => {
+    const rec = new SR();
+    rec.lang = 'it-IT';
+    rec.interimResults = true;
+    rec.continuous = true;
+    rec.maxAlternatives = 1;
+    s.rec = rec;
+    rec.onresult = e => {
+      if (!s.active) return;
+      s.interim = '';
+      for (let k = e.resultIndex; k < e.results.length; k++) {
+        const t = e.results[k][0].transcript.trim();
+        if (!t) continue;
+        if (e.results[k].isFinal) {
+          // Su alcuni Android il risultato finale ripete anche le frasi precedenti
+          if (s.lastFinal && t.toLowerCase().startsWith(s.lastFinal.toLowerCase())) {
+            s.committed = join(s.committed.slice(0, s.committed.length - s.lastFinal.length - 1).trimEnd(), t);
+          } else s.committed = join(s.committed, t);
+          s.committed += ' ';
+          s.lastFinal = t;
+        } else s.interim = join(s.interim, t);
+      }
+      input.value = s.text();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      s.restarts = 0;
+    };
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { toast('Serve il permesso per usare il microfono'); stopDictation(); }
+      else if (e.error === 'network') { toast('La dettatura richiede la connessione'); stopDictation(); }
+      else if (e.error === 'audio-capture') { toast('Non trovo il microfono'); stopDictation(); }
+      // "no-speech" e "aborted" sono normali durante le pause: si riparte da onend
+    };
+    rec.onend = () => {
+      if (!s.active || session !== s) return;
+      // Fine di un tratto: fisso il testo provvisorio e riprendo ad ascoltare
+      if (s.interim) { s.committed = join(s.committed, s.interim) + ' '; s.interim = ''; }
+      s.lastFinal = '';
+      input.value = s.text();
+      if (++s.restarts > 8) { toast('Dettatura in pausa: tocca il microfono per riprendere'); stopDictation(); return; }
+      setTimeout(() => { if (s.active && session === s) { try { start(); } catch (_) { stopDictation(); } } }, 250);
+    };
+    rec.start();
+  };
+  session = s;
+  button.classList.add('listening');
+  button.setAttribute('aria-label', 'Ferma la dettatura');
+  input.placeholder = 'Ti ascolto… tocca Invia quando hai finito';
+  try { start(); } catch (err) { stopDictation(); toast('Dettatura non riuscita, riprova'); }
+}
+
+// Se lasci la schermata o l'app, la dettatura si ferma
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') stopDictation(); });

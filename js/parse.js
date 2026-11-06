@@ -1,7 +1,7 @@
 // Inserimento rapido: interpreta frasi come "dentista il 20 novembre alle 15".
 // Non usa l'AI: riconosce date, orari e tipo con regole semplici.
 // Il risultato viene sempre mostrato in un modulo da confermare.
-import { toISO, addDays, pad } from './dates.js?v=2.1.1';
+import { toISO, addDays, pad } from './dates.js?v=2.1.2';
 
 const MONTHS = {
   gennaio: 1, febbraio: 2, marzo: 3, aprile: 4, maggio: 5, giugno: 6, luglio: 7, agosto: 8,

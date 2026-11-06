@@ -1,9 +1,9 @@
 // Assistente: conversazione, uso degli strumenti, proposte da confermare, voce.
-import { state, commit } from '../store.js?v=2.1.1';
-import * as D from '../dates.js?v=2.1.1';
-import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.1.1';
-import * as gemini from './gemini.js?v=2.1.1';
-import { toolDefs, runTool, applyProposal } from './tools.js?v=2.1.1';
+import { state, commit } from '../store.js?v=2.1.2';
+import * as D from '../dates.js?v=2.1.2';
+import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.1.2';
+import * as gemini from './gemini.js?v=2.1.2';
+import { toolDefs, runTool, applyProposal } from './tools.js?v=2.1.2';
 
 const PROVIDERS = { gemini };
 const KEY_STORE = 'spazio-personale-ai-key';
@@ -375,5 +375,5 @@ export const actions = {
   'ai-speak': el => { const m = chat.view[+el.dataset.i]; if (m) speak(m.text); },
   'ai-new': () => { if (confirm('Iniziare una nuova conversazione?')) { resetChat(); rerender(); } },
   'ai-settings': () => openAISettings(),
-  'ai-voice': el => { const f = el.closest('form'); dictate(f.q, el, t => { f.q.value = ''; send(t); }); },
+  'ai-voice': el => dictate(el.closest('form').q, el),
 };
