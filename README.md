@@ -1,4 +1,4 @@
-# Spazio personale — v2.0
+# Spazio personale — v2.1
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -31,6 +31,14 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 - Interessi stabili e curiosità del momento.
 - Pausa e ripresa, note, modifica ed eliminazione.
 
+**Assistente (Google Gemini, piano gratuito)**
+- Conversazione scritta o dettata, con lettura facoltativa delle risposte ad alta voce (voce del telefono).
+- Legge agenda, progetti e interessi, solo se gli dai il permesso. Le note personali sono escluse se non le attivi.
+- Può preparare impegni, modifiche, progetti con passaggi e interessi: compaiono come **proposte** da confermare o annullare. Nulla viene salvato senza il tuo tocco.
+- Sceglie da solo il miglior modello Flash disponibile e passa a un altro se quello scelto non è gratuito.
+- La chiave API resta solo sul dispositivo e non finisce nei backup.
+- Limiti: non ha accesso a internet (non conosce eventi, orari o notizie del giorno); con il piano gratuito Google può usare le conversazioni per migliorare i suoi servizi.
+
 **Dati**
 - Tutto è salvato solo sul dispositivo.
 - Backup scaricabile in un file e ripristino da file (Impostazioni).
@@ -41,9 +49,9 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 ## Cosa non c'è ancora
 
 - **Notifiche sul telefono ad app chiusa.** I promemoria compaiono quando apri l'app. Per notifiche affidabili su Android serve un piccolo servizio esterno (fase 3).
-- **Assistente AI.** La sezione indica chiaramente che non è collegato (fase 4).
-- **Scoperta di contenuti** (articoli, podcast, video): richiede l'AI.
-- **Risposte lette ad alta voce** (fase 5).
+- **Ricerca sul web per l'assistente** (eventi, notizie, contenuti recenti).
+- **Apprendimento automatico delle preferenze**: per ora il contesto si scrive a mano in «Su di te».
+- **Altri fornitori AI**: la struttura li prevede (`js/ai/`), per ora c'è solo Gemini.
 - **Sincronizzazione tra dispositivi**: per passare a un altro dispositivo usa backup e ripristino (fase 6).
 
 ## Struttura dei file
@@ -57,9 +65,12 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 | `js/store.js` | Salvataggio dei dati, importazione dalla v0.1, backup |
 | `js/dates.js` | Calcoli su date e ripetizioni |
 | `js/parse.js` | Interpretazione delle frasi dell'inserimento rapido |
+| `js/ai/assistant.js` | Conversazione, proposte, voce, impostazioni dell'assistente |
+| `js/ai/gemini.js` | Collegamento a Google Gemini (sostituibile con altri fornitori) |
+| `js/ai/tools.js` | Cosa l'assistente può leggere e proporre |
 | `sw.js` | Funzionamento offline |
 
-Non inserire mai chiavi API in questi file: sono pubblici.
+Non inserire mai chiavi API in questi file: sono pubblici. La chiave si inserisce dall'app e resta sul telefono.
 
 ## Aggiornamenti
 

@@ -3,13 +3,14 @@ import { load, onChange } from './store.js';
 import { toast, dictate, closeSheet } from './ui.js';
 import { parseQuick } from './parse.js';
 import * as V from './views.js';
+import * as AI from './ai/assistant.js';
 
 const ROUTES = {
   oggi: V.renderToday,
   impegni: V.renderAgenda,
   interessi: V.renderInterests,
   progetti: V.renderProjects,
-  assistente: V.renderAssistant,
+  assistente: AI.renderAssistant,
 };
 const main = document.getElementById('main');
 
@@ -20,9 +21,17 @@ const route = () => {
 
 function render() {
   const r = route();
+  // Conserva quello che stavi scrivendo se la schermata si aggiorna
+  const typing = [...main.querySelectorAll('[data-form] [name=q]')].map(el => [el.closest('[data-form]').dataset.form, el.value, el === document.activeElement]);
   main.innerHTML = ROUTES[r]();
+  for (const [form, value, focused] of typing) {
+    const el = main.querySelector(`[data-form=${form}] [name=q]`);
+    if (el && value) { el.value = value; if (focused) el.focus(); }
+  }
   document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
+  if (r === 'assistente') AI.afterRender();
 }
+AI.setRender(render);
 
 let lastRoute = null;
 window.addEventListener('hashchange', () => {
@@ -53,6 +62,7 @@ const actions = {
   'resume-interest': el => V.setInterestStatus(el.dataset.id, 'attivo'),
   'snooze-project': el => V.snooze('project', el.dataset.id),
   'snooze-interest': el => V.snooze('interest', el.dataset.id),
+  ...AI.actions,
   voice: el => {
     const form = el.closest('form');
     dictate(form.q, el, text => handleQuick(text));
@@ -88,8 +98,24 @@ document.addEventListener('submit', e => {
   if (!f) return;
   e.preventDefault();
   if (f.dataset.form === 'quick') handleQuick(f.q.value);
+  if (f.dataset.form === 'ai-key') AI.connect(f.key.value);
+  if (f.dataset.form === 'ai-chat') { const t = f.q.value; f.q.value = ''; AI.send(t); }
   if (f.dataset.form === 'interest') {
     if (V.addInterest(f.name.value, f.querySelector('input[name=kind]:checked').value)) f.name.value = '';
+  }
+});
+
+// Nella chat: Invio manda il messaggio, Maiusc+Invio va a capo; il campo cresce col testo
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && e.target.matches('[data-form=ai-chat] textarea')) {
+    e.preventDefault();
+    e.target.form.requestSubmit();
+  }
+});
+document.addEventListener('input', e => {
+  if (e.target.matches('[data-form=ai-chat] textarea')) {
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
   }
 });
 

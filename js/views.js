@@ -24,7 +24,7 @@ export function leadLabel(m) {
   if (m % 60 === 0) return `${m / 60} ore prima`;
   return `${m} minuti prima`;
 }
-const recLabel = r => (!r || r.freq === 'none' ? '' : r.interval > 1 ? `Ogni ${r.interval} ${UNIT[r.freq][1]}` : FREQ[r.freq]);
+export const recLabel = r => (!r || r.freq === 'none' ? '' : r.interval > 1 ? `Ogni ${r.interval} ${UNIT[r.freq][1]}` : FREQ[r.freq]);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // ---------- Dati calcolati
@@ -536,7 +536,7 @@ export function renderInterests() {
     ${paused.length ? `<h2 class="sec">In pausa</h2><div class="list">${paused.map(interestRow).join('')}</div>` : ''}
     <div class="info-card">
       <strong>Scoperta di contenuti</strong>
-      <p>Suggerimenti di articoli, podcast, video e libri arriveranno quando collegheremo l'assistente AI. Per ora questa sezione tiene traccia di cosa ti interessa, e l'app ti ricorda ogni tanto un argomento nei giorni liberi.</p>
+      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: conosce i tuoi interessi, se gli dai il permesso. Non ha accesso a internet, quindi non conosce le uscite più recenti.</p>
     </div>
   </section>`;
 }
@@ -601,32 +601,6 @@ export function snooze(kind, id) {
   commit(); toast('Va bene, non te lo ripropongo per un po\'');
 }
 
-// ---------- ASSISTENTE
-
-export function renderAssistant() {
-  return `<section class="view">
-    <header class="page-head"><h1>Assistente</h1></header>
-    <div class="status-card">
-      <span class="status-dot"></span>
-      <div><strong>Non ancora collegato</strong>
-      <p>L'assistente AI non è attivo in questa versione. Tutto il resto dell'app funziona senza.</p></div>
-    </div>
-    <h2 class="sec">Cosa puoi già fare senza AI</h2>
-    <ul class="plain">
-      <li>${icon('mic', 'xs')} Dettare un impegno con il microfono nella barra di inserimento rapido${voiceSupported ? '' : ' (non disponibile su questo browser)'}.</li>
-      <li>${icon('calendar', 'xs')} Scrivere frasi come «chiamare il commercialista venerdì alle 10»: data e ora vengono riconosciute da sole.</li>
-      <li>${icon('spark', 'xs')} Ricevere nella schermata Oggi qualche proposta per i giorni liberi, basata sui tuoi progetti e interessi.</li>
-    </ul>
-    <h2 class="sec">In arrivo</h2>
-    <ul class="plain muted-list">
-      <li>Conversazione scritta e vocale, con risposte lette ad alta voce.</li>
-      <li>Creare e modificare impegni e progetti parlando.</li>
-      <li>Organizzare la giornata e suggerire contenuti da approfondire.</li>
-      <li>Scelta libera del fornitore AI, con permessi chiari su quali dati condividere.</li>
-    </ul>
-  </section>`;
-}
-
 // ---------- IMPOSTAZIONI
 
 export function openSettings() {
@@ -652,7 +626,7 @@ export function openSettings() {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.1</p>`, sheet => {
     sheet.querySelectorAll('[data-lead]').forEach(el => el.addEventListener('change', () => {
       state.settings.reminders[el.dataset.lead] = el.value === '' ? null : +el.value;
       commit(); toast('Salvato');

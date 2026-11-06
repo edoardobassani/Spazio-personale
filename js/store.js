@@ -14,13 +14,33 @@ export const state = {};
 const listeners = [];
 export const onChange = fn => listeners.push(fn);
 
+// Impostazioni dell'assistente (la chiave API NON sta qui: resta a parte e non finisce nei backup)
+export function defaultAI() {
+  return {
+    provider: 'gemini', model: '', models: [], speak: false, about: '',
+    perms: { events: true, projects: true, interests: true, notes: false },
+  };
+}
+
+function normAI(a = {}) {
+  const d = defaultAI();
+  return {
+    provider: 'gemini',
+    model: typeof a.model === 'string' ? a.model : '',
+    models: Array.isArray(a.models) ? a.models.filter(m => m && m.id).slice(0, 40) : [],
+    speak: !!a.speak,
+    about: str(a.about).slice(0, 2000),
+    perms: Object.fromEntries(Object.keys(d.perms).map(k => [k, a.perms && typeof a.perms[k] === 'boolean' ? a.perms[k] : d.perms[k]])),
+  };
+}
+
 function defaults() {
   return {
     version: 2,
     events: [],
     projects: [],
     interests: [],
-    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 } },
+    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 }, ai: defaultAI() },
     meta: { createdAt: nowISO(), lastExport: null, migratedFromV1: false },
   };
 }
@@ -93,7 +113,10 @@ export function normalize(raw) {
     events: arr(s.events).map(normEvent),
     projects: arr(s.projects).map(normProject),
     interests: arr(s.interests).map(normInterest),
-    settings: { reminders: { ...d.settings.reminders, ...(s.settings && s.settings.reminders) } },
+    settings: {
+      reminders: { ...d.settings.reminders, ...(s.settings && s.settings.reminders) },
+      ai: normAI(s.settings && s.settings.ai),
+    },
     meta: { ...d.meta, ...(s.meta || {}) },
   };
 }
