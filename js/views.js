@@ -1,8 +1,8 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.3.0';
-import * as D from './dates.js?v=2.3.0';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.3.0';
-import { renderFreeTime, renderSaved } from './learn.js?v=2.3.0';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.4.0';
+import * as D from './dates.js?v=2.4.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.4.0';
+import { renderFreeTime, renderSaved } from './learn.js?v=2.4.0';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -709,7 +709,7 @@ export function renderInterests() {
     <button class="btn profile-btn" data-action="open-profile">${icon('spark', 'xs')} Cosa ho imparato di te</button>
     <div class="info-card">
       <strong>Scoperta di contenuti</strong>
-      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: conosce i tuoi interessi, se gli dai il permesso. Non ha accesso a internet, quindi non conosce le uscite più recenti.</p>
+      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: conosce i tuoi interessi, se gli dai il permesso, e può cercare sul web.</p>
     </div>
   </section>`;
 }
@@ -814,7 +814,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.3.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.4.0</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');
@@ -858,5 +858,95 @@ export function openSettings(section = '') {
       showPersist(ok);
       toast(ok ? 'Dati protetti' : 'Il browser non l\'ha concessa: di solito succede dopo aver installato l\'app');
     });
+  });
+}
+
+// ---------- RICERCA NELL'APP
+
+const foldText = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+// Evidenzia le parole cercate nel testo (già senza HTML)
+function mark(text, words) {
+  let out = esc(text);
+  if (!words.length) return out;
+  const plain = foldText(text);
+  const ranges = [];
+  for (const w of words) {
+    let i = plain.indexOf(w);
+    while (i >= 0) { ranges.push([i, i + w.length]); i = plain.indexOf(w, i + w.length); }
+  }
+  if (!ranges.length) return out;
+  ranges.sort((a, b) => a[0] - b[0]);
+  let res = '', pos = 0;
+  for (const [a, b] of ranges) {
+    if (a < pos) continue;
+    res += esc(text.slice(pos, a)) + '<mark>' + esc(text.slice(a, b)) + '</mark>';
+    pos = b;
+  }
+  return res + esc(text.slice(pos));
+}
+
+// Frammento di testo attorno alla prima parola trovata
+function snippet(text, words) {
+  const plain = foldText(text);
+  const i = Math.min(...words.map(w => plain.indexOf(w)).filter(x => x >= 0));
+  if (!Number.isFinite(i)) return '';
+  const a = Math.max(0, i - 30), b = Math.min(text.length, i + 70);
+  return (a > 0 ? '…' : '') + text.slice(a, b).replace(/\s+/g, ' ') + (b < text.length ? '…' : '');
+}
+
+export function searchAll(query) {
+  const words = foldText(query).split(/\s+/).filter(w => w.length >= 2);
+  if (!words.length) return { words, groups: [] };
+  const hit = fields => words.every(w => fields.some(f => foldText(f).includes(w)));
+  const t = D.todayISO();
+  const ev = state.events.filter(e => hit([e.title, e.location, e.notes, e.category])).map(e => {
+    const next = D.occurrences(e, t, D.addDaysISO(t, 400))[0];
+    const last = next ? '' : (D.occurrences(e, D.addDaysISO(t, -730), D.addDaysISO(t, -1)).pop() || e.date);
+    const date = next || last;
+    const extra = [e.notes, e.location].find(x => x && words.some(w => foldText(x).includes(w)));
+    return { kind: 'event', id: e.id, date, title: e.title, sub: `${next ? D.relDay(next) : 'Passato: ' + D.fmt(date, { day: 'numeric', month: 'short', year: 'numeric' })}${e.start ? ' · ' + e.start : ''} · ${TYPE[e.type].label}${recLabel(e.recurrence) ? ' · ' + recLabel(e.recurrence) : ''}`, extra: extra ? snippet(extra, words) : '', sort: next ? 0 : 1, key: date };
+  }).sort((a, b) => a.sort - b.sort || (a.sort ? b.key.localeCompare(a.key) : a.key.localeCompare(b.key)));
+  const pr = state.projects.filter(p => hit([p.name, p.goal, p.description, p.notes, ...p.steps.map(s => s.text)])).map(p => {
+    const where = [p.goal, p.description, p.notes, ...p.steps.map(s => s.text)].find(x => x && words.some(w => foldText(x).includes(w)));
+    return { kind: 'project', id: p.id, title: p.name, sub: `Progetto · ${PSTATUS[p.status]}`, extra: where ? snippet(where, words) : '' };
+  });
+  const it = state.interests.filter(i => hit([i.name, i.notes])).map(i => ({
+    kind: 'interest', id: i.id, title: i.name, sub: i.kind === 'curiosita' ? 'Curiosità del momento' : 'Interesse',
+    extra: i.notes && words.some(w => foldText(i.notes).includes(w)) ? snippet(i.notes, words) : '',
+  }));
+  const sv = state.saved.filter(x => hit([x.title, x.detail])).map(x => ({ kind: 'saved', id: x.id, title: x.title, sub: 'Salvato per dopo', extra: x.detail ? snippet(x.detail, words) : '' }));
+  const groups = [['Impegni', ev], ['Progetti', pr], ['Interessi', it], ['Salvati per dopo', sv]].filter(([, l]) => l.length);
+  return { words, groups };
+}
+
+export function openSearch() {
+  openSheet(`
+    <div class="sheet-head"><h2>Cerca</h2><button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
+    <div class="search-box">${icon('search')}<input type="search" data-q placeholder="Impegni, progetti, interessi, note…" autocomplete="off" enterkeyhint="search" aria-label="Cerca"></div>
+    <div class="search-results"><p class="hint">Cerca nei titoli, nei luoghi, nelle note e nei passaggi dei progetti.</p></div>`, sheet => {
+    const input = sheet.querySelector('[data-q]');
+    const box = sheet.querySelector('.search-results');
+    let timer;
+    const run = () => {
+      const q = input.value.trim();
+      const { words, groups } = searchAll(q);
+      if (!words.length) { box.innerHTML = '<p class="hint">Scrivi almeno due lettere.</p>'; return; }
+      if (!groups.length) { box.innerHTML = `<p class="hint">Nessun risultato per «${esc(q)}».</p>`; return; }
+      box.innerHTML = groups.map(([label, list]) => `<h3 class="sub">${label} <small>${list.length}</small></h3>
+        <div class="list">${list.slice(0, 20).map(r => `<button class="result" data-kind="${r.kind}" data-id="${r.id}" data-date="${r.date || ''}">
+          <strong>${mark(r.title, words)}</strong><small>${esc(r.sub)}</small>${r.extra ? `<span class="snip">${mark(r.extra, words)}</span>` : ''}</button>`).join('')}</div>`).join('');
+    };
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 120); });
+    box.addEventListener('click', e => {
+      const r = e.target.closest('.result');
+      if (!r) return;
+      const { kind, id, date } = r.dataset;
+      if (kind === 'event') openEventSheet(id, {}, [], date);
+      else if (kind === 'project') openProjectSheet(id);
+      else if (kind === 'interest') openInterestSheet(id);
+      else { closeSheet(); location.hash = '#interessi'; }
+    });
+    setTimeout(() => input.focus(), 60);
   });
 }

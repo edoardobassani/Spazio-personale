@@ -1,9 +1,10 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.3.0';
-import * as D from '../dates.js?v=2.3.0';
-import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.3.0';
+import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.4.0';
+import * as D from '../dates.js?v=2.4.0';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.4.0';
+import { webSearch } from './search.js?v=2.4.0';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
@@ -30,6 +31,12 @@ const EVENT_PROPS = {
 };
 
 const DEFS = [
+  { name: 'cerca_web', access: 'web', write: false,
+    description: "Cerca informazioni sul web (Google se disponibile, altrimenti Wikipedia). Usalo per fatti recenti, eventi, luoghi, orari, notizie, o per verificare un'informazione o trovare contenuti (libri, podcast, documentari) su un tema. Formula ricerche brevi e precise, in italiano, includendo luogo e periodo se servono.",
+    parameters: { type: 'object', properties: {
+      query: S('Testo della ricerca'),
+      scopo: S('attualita (notizie, eventi, orari, prezzi), luoghi_eventi (posti da visitare, cosa fare in un luogo), approfondimento (storia, scienza, cultura, contenuti)', { enum: ['attualita', 'luoghi_eventi', 'approfondimento'] }),
+    }, required: ['query', 'scopo'] } },
   { name: 'get_events', access: 'events', write: false,
     description: "Legge gli impegni (appuntamenti, attività, scadenze) dell'utente tra due date, incluse le ripetizioni. Usalo sempre prima di rispondere su agenda o tempo libero.",
     parameters: { type: 'object', properties: { from: S('Data iniziale AAAA-MM-GG'), to: S('Data finale AAAA-MM-GG (massimo 120 giorni dopo)') }, required: ['from', 'to'] } },
@@ -135,15 +142,19 @@ function proposal(kind, args, title, lines) {
 
 // ---------- Esecuzione
 
-export function runTool(name, args, perms) {
+export async function runTool(name, args, perms, ctx = {}) {
   const def = DEFS.find(d => d.name === name);
   if (!def) return { response: { errore: `Strumento sconosciuto: ${name}` } };
-  if (!perms[def.access]) return { response: { errore: "L'utente non ti ha dato il permesso di accedere a questi dati." } };
-  try { return EXEC[name](args || {}, perms); }
+  if (!perms[def.access]) return { response: { errore: "L'utente non ti ha dato il permesso per questo." } };
+  try { return await EXEC[name](args || {}, perms, ctx); }
   catch (e) { console.error(e); return { response: { errore: 'Errore interno: ' + e.message } }; }
 }
 
 const EXEC = {
+  cerca_web({ query, scopo }, perms, ctx) {
+    return webSearch({ query, purpose: scopo }, ctx);
+  },
+
   get_events({ from, to }, perms) {
     if (!isDate(from) || !isDate(to)) return { response: { errore: 'Le date devono essere AAAA-MM-GG' } };
     if (to < from) [from, to] = [to, from];

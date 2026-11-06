@@ -1,10 +1,11 @@
 // Assistente: conversazione, uso degli strumenti, proposte da confermare, voce.
-import { state, commit } from '../store.js?v=2.3.0';
-import * as D from '../dates.js?v=2.3.0';
-import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.3.0';
-import * as gemini from './gemini.js?v=2.3.0';
-import { toolDefs, runTool, applyProposal } from './tools.js?v=2.3.0';
-import { learnedSummary } from '../learn.js?v=2.3.0';
+import { state, commit } from '../store.js?v=2.4.0';
+import * as D from '../dates.js?v=2.4.0';
+import { esc, icon, toast, openSheet, closeSheet, dictate, voiceSupported } from '../ui.js?v=2.4.0';
+import * as gemini from './gemini.js?v=2.4.0';
+import { toolDefs, runTool, applyProposal } from './tools.js?v=2.4.0';
+import { learnedSummary } from '../learn.js?v=2.4.0';
+import { googleStatus, resetGoogle } from './search.js?v=2.4.0';
 
 const PROVIDERS = { gemini };
 const KEY_STORE = 'spazio-personale-ai-key';
@@ -22,7 +23,7 @@ export const isConnected = () => !!getKey() && !!ai().model;
 
 // ---------- Conversazione salvata sul dispositivo
 
-const chat = { view: [], history: [], notes: [], busy: false };
+const chat = { view: [], history: [], notes: [], busy: false, status: '' };
 function loadChat() {
   try {
     const c = JSON.parse(localStorage.getItem(CHAT_STORE) || 'null');
@@ -66,7 +67,7 @@ Come rispondere:
 - Gli strumenti che modificano i dati NON salvano nulla: creano una proposta che l'utente conferma con un pulsante. Quindi di' «te l'ho preparato, confermalo qui sopra», mai «l'ho aggiunto».
 - Se manca un'informazione essenziale (per esempio la data) o la richiesta è ambigua, chiedi prima di proporre. Se la data è relativa («venerdì», «tra due settimane») calcolala tu da oggi.
 - Quando suggerisci attività o cose da fare: poche proposte (al massimo tre), pertinenti, con il motivo, il tempo richiesto ed eventuali costi. La decisione è sempre dell'utente. Niente punteggi, serie o sensi di colpa per le cose lasciate a metà.
-- Distingui ciò che sai con certezza da ciò che non sai. Non hai accesso a internet: non conosci eventi, orari di apertura, meteo o notizie di oggi; se servono, dillo e suggerisci di verificare. Se consigli libri, podcast o documentari, cita solo opere che conosci con sicurezza e non inventare titoli o link.
+- Distingui ciò che sai con certezza da ciò che non sai. ${p.web ? `Puoi cercare sul web con lo strumento cerca_web: usalo per eventi, luoghi, orari, notizie e fatti recenti, e quando vuoi verificare qualcosa. Basa la risposta su quello che trovi e non inventare dettagli che i risultati non dicono. Le fonti vengono mostrate all'utente sotto la tua risposta, quindi non serve elencare i link.` : 'Non hai accesso a internet: non conosci eventi, orari di apertura, meteo o notizie di oggi; se servono, dillo e suggerisci di verificare.'} Se consigli libri, podcast o documentari, cita solo opere che conosci con sicurezza o che hai trovato cercando, e non inventare titoli o link.
 - L'utente preferisce contenuti approfonditi e basati su fatti verificabili.
 
 Dati a cui puoi accedere: ${can.length ? can.join(', ') : 'nessuno'}${p.notes ? ', comprese le note' : ' (senza le note personali)'}. Se ti serve qualcosa a cui non hai accesso, dillo.
@@ -120,21 +121,29 @@ export async function send(text) {
   chat.busy = true;
   rerender();
   let finalText = '';
+  const found = { sources: [], html: '' };
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const res = await generateWithFallback({ key, system: systemPrompt(), history: chat.history, tools: toolDefs(ai().perms) });
       chat.history.push({ role: 'model', raw: res.raw });
       if (!res.calls.length) {
         finalText = res.text || 'Non ho una risposta da darti, prova a riformulare.';
-        chat.view.push({ role: 'assistant', text: finalText });
+        const seen = new Set();
+        const sources = found.sources.filter(x => !seen.has(x.url) && seen.add(x.url)).slice(0, 8);
+        chat.view.push({ role: 'assistant', text: finalText, sources, searchHTML: found.html || undefined });
         break;
       }
       if (res.text) chat.view.push({ role: 'assistant', text: res.text });
-      const results = res.calls.map(c => {
-        const out = runTool(c.name, c.args, ai().perms);
+      const results = [];
+      for (const c of res.calls) {
+        if (c.name === 'cerca_web') { chat.status = `Cerco sul web: ${String((c.args || {}).query || '').slice(0, 60)}`; rerender(); }
+        const out = await runTool(c.name, c.args, ai().perms, { key, model: ai().model });
+        chat.status = '';
         if (out.proposal) chat.view.push({ role: 'proposal', proposal: out.proposal });
-        return { callId: c.callId, name: c.name, response: out.response };
-      });
+        if (out.sources) found.sources.push(...out.sources);
+        if (out.suggestionsHTML) found.html = out.suggestionsHTML;
+        results.push({ callId: c.callId, name: c.name, response: out.response });
+      }
       chat.history.push({ role: 'tool', results });
       rerender();
       if (round === MAX_ROUNDS - 1) chat.view.push({ role: 'assistant', text: 'Mi sono fermato: la richiesta richiedeva troppi passaggi. Prova a dividerla.' });
@@ -246,9 +255,17 @@ function proposalCard(p) {
   </div>`;
 }
 
+// Fonti della ricerca web, e i suggerimenti di ricerca che Google chiede di mostrare
+function sourcesHTML(m) {
+  if (!m.sources || !m.sources.length) return '';
+  const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+  return `<div class="sources"><span>Fonti</span>${m.sources.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title || host(x.url))}</a>`).join('')}</div>
+    ${m.searchHTML ? `<iframe class="gsearch" sandbox="allow-popups allow-popups-to-escape-sandbox" srcdoc="${esc(m.searchHTML)}" title="Ricerche suggerite da Google"></iframe>` : ''}`;
+}
+
 function message(m, i) {
   if (m.role === 'user') return `<div class="msg user"><div class="bubble">${esc(m.text)}</div></div>`;
-  if (m.role === 'assistant') return `<div class="msg bot"><div class="bubble">${md(m.text)}
+  if (m.role === 'assistant') return `<div class="msg bot"><div class="bubble">${md(m.text)}${sourcesHTML(m)}
     <button class="listen" data-action="ai-speak" data-i="${i}" aria-label="Ascolta la risposta">${icon('play', 'xs')} Ascolta</button></div></div>`;
   if (m.role === 'proposal') return `<div class="msg bot">${proposalCard(m.proposal)}</div>`;
   if (m.role === 'error') return `<div class="msg bot"><div class="bubble error-bubble"><p>${esc(m.text)}</p>
@@ -290,7 +307,7 @@ export function renderAssistant() {
           <p>Chiedimi della tua agenda, del tempo libero, dei progetti. Posso preparare impegni e progetti: li confermi tu con un tocco.</p>
           <div class="chips">${EXAMPLES.map(e => `<button class="chip-btn" data-action="ai-prompt" data-text="${esc(e)}">${esc(e)}</button>`).join('')}</div>
         </div>`}
-      ${chat.busy ? '<div class="msg bot"><div class="bubble typing"><i></i><i></i><i></i></div></div>' : ''}
+      ${chat.busy ? `<div class="msg bot"><div class="bubble typing"><i></i><i></i><i></i>${chat.status ? `<span class="typing-status">${esc(chat.status)}</span>` : ''}</div></div>` : ''}
     </div>
     <form class="chat-input" data-form="ai-chat">
       <textarea name="q" rows="1" placeholder="Scrivi o detta…" data-placeholder="Scrivi o detta…" enterkeyhint="send" aria-label="Messaggio"${chat.busy ? ' disabled' : ''}></textarea>
@@ -346,7 +363,10 @@ export function openAISettings() {
       ${perm('interests', 'Interessi', 'Leggere gli interessi e proporne di nuovi')}
       ${perm('notes', 'Note personali', 'Includere le note di impegni, progetti e interessi')}
       ${perm('learning', 'Preferenze apprese', 'Usare quello che l\'app ha imparato dalle tue scelte')}
+      ${perm('web', 'Ricerca sul web', 'Cercare notizie, eventi, luoghi e contenuti (le ricerche vanno a Google o Wikipedia)')}
     </div>
+    <p class="hint web-status">${{ ok: 'Ricerca web: uso Google.', unavailable: 'Ricerca web: Google non è disponibile con questa chiave (di solito serve un account con fatturazione). Uso Wikipedia, che non ha notizie né eventi aggiornati.', unknown: 'Ricerca web: Google verrà provato alla prima ricerca; se non è disponibile, uso Wikipedia.' }[googleStatus()]}
+      ${googleStatus() === 'unavailable' ? '<button type="button" class="link" data-web-retry>Riprova Google</button>' : ''}</p>
     <h3 class="sub">Su di te</h3>
     <p class="hint">Facoltativo. Quello che scrivi qui viene inviato all'assistente a ogni richiesta, per dargli il contesto (orari, lavoro, abitudini, preferenze).</p>
     <div class="form"><label class="field"><textarea data-about rows="5" maxlength="2000" placeholder="Es. Lavoro in un'azienda vitivinicola, mi sveglio alle 5:30 e vado a dormire verso le 22. Palestra tre volte a settimana, porto a spasso il cane.">${esc(a.about)}</textarea></label></div>
@@ -371,6 +391,8 @@ export function openAISettings() {
       } catch (e) { toast(e.message, 'bad'); }
     });
     sheet.querySelector('[data-clear]').addEventListener('click', () => { resetChat(); closeSheet(); rerender(); });
+    const wr = sheet.querySelector('[data-web-retry]');
+    if (wr) wr.addEventListener('click', () => { resetGoogle(); openAISettings(); toast('Riproverò Google alla prossima ricerca'); });
     sheet.querySelector('[data-disconnect]').addEventListener('click', () => {
       if (!confirm("Rimuovere la chiave? L'assistente smetterà di funzionare finché non la inserisci di nuovo.")) return;
       setKey(''); a.model = ''; a.models = []; resetChat(); closeSheet(); commit();

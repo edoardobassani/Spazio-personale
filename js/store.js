@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.3.0';
+import { todayISO } from './dates.js?v=2.4.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -18,7 +18,8 @@ export const onChange = fn => listeners.push(fn);
 export function defaultAI() {
   return {
     provider: 'gemini', model: '', models: [], speak: false, about: '',
-    perms: { events: true, projects: true, interests: true, notes: false, learning: true },
+    perms: { events: true, projects: true, interests: true, notes: false, learning: true, web: true },
+    web: { google: 'unknown', checkedAt: '', detail: '' },
   };
 }
 
@@ -31,6 +32,11 @@ function normAI(a = {}) {
     speak: !!a.speak,
     about: str(a.about).slice(0, 2000),
     perms: Object.fromEntries(Object.keys(d.perms).map(k => [k, a.perms && typeof a.perms[k] === 'boolean' ? a.perms[k] : d.perms[k]])),
+    web: {
+      google: ['ok', 'unavailable'].includes(a.web && a.web.google) ? a.web.google : 'unknown',
+      checkedAt: a.web && isDate(a.web.checkedAt) ? a.web.checkedAt : '',
+      detail: str(a.web && a.web.detail).slice(0, 300),
+    },
   };
 }
 

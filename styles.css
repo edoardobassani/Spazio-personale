@@ -386,3 +386,21 @@ a { color: var(--green); }
 .habits { list-style: none; padding: 0; margin: 4px 0; display: flex; flex-direction: column; gap: 6px; }
 .habits li { display: flex; align-items: center; gap: 6px; background: var(--paper); border-radius: 12px; padding: 4px 4px 4px 12px; font-size: 14px; }
 .habits li span { flex: 1; }
+
+/* Ricerca */
+.top-actions { display: flex; gap: 2px; }
+.search-box { display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 0 12px; margin: 6px 0 4px; }
+.search-box .ic { color: var(--muted); }
+.search-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; height: 48px; font-size: 16px; }
+.search-results .sub small { color: var(--muted); font-weight: 600; font-size: 13px; }
+.result { display: flex; flex-direction: column; gap: 2px; text-align: left; background: var(--paper); border: 0; border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); }
+.result strong { font-size: 15.5px; }
+.result small { color: var(--muted); font-size: 13px; }
+.result .snip { font-size: 13.5px; color: var(--ink2); }
+mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+/* Fonti della ricerca web */
+.sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sources span { width: 100%; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.sources a { font-size: 13px; background: var(--bg); border-radius: 999px; padding: 5px 10px; text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gsearch { width: 100%; border: 0; height: 64px; margin-top: 6px; border-radius: 10px; background: transparent; }
+.typing-status { margin-left: 8px; font-size: 13px; color: var(--muted); align-self: center; }

@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=2.3.0">
+  <link rel="stylesheet" href="styles.css?v=2.4.0">
   <script>
     // Se qualcosa si rompe, lo mostro a schermo invece di lasciare l'app muta
     window.addEventListener('error', function (e) {
@@ -32,9 +32,14 @@
   <div class="app">
     <header class="top">
       <a class="brand" href="#oggi"><img src="icon.svg" alt="" width="28" height="28">Spazio</a>
+      <span class="top-actions">
+      <button class="icon-btn" data-action="open-search" aria-label="Cerca">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </button>
       <button class="icon-btn" data-action="open-settings" aria-label="Impostazioni">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
       </button>
+      </span>
     </header>
 
     <div id="boot-error" class="boot-error" hidden>
@@ -59,6 +64,6 @@
   <dialog id="sheet" class="sheet" aria-modal="true"></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="js/app.js?v=2.3.0"></script>
+  <script type="module" src="js/app.js?v=2.4.0"></script>
 </body>
 </html>
