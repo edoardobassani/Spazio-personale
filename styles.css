@@ -62,7 +62,7 @@ a { color: var(--vine); }
 /* ---------- Barra in alto e navigazione */
 .top { display: flex; align-items: center; justify-content: space-between; height: 56px; padding-top: env(safe-area-inset-top); }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 18px; letter-spacing: -.2px; color: var(--ink); text-decoration: none; }
-.brand img { border-radius: 8px; }
+.brand img { border-radius: 8px; box-shadow: 0 0 0 1px var(--line-strong); }
 .top-actions { display: flex; gap: 0; }
 
 .tabs {
