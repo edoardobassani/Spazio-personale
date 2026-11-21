@@ -1,10 +1,10 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest } from '../store.js?v=2.7.0';
-import * as D from '../dates.js?v=2.7.0';
-import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.7.0';
-import { webSearch } from './search.js?v=2.7.0';
+import { state, uid, touch, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from '../store.js?v=2.8.0';
+import * as D from '../dates.js?v=2.8.0';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.8.0';
+import { webSearch } from './search.js?v=2.8.0';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
@@ -79,6 +79,17 @@ const DEFS = [
     parameters: { type: 'object', properties: {
       id: S("Id dell'interesse"), kind: S('Tipo', { enum: ['stabile', 'curiosita'] }), status: S('Stato', { enum: ['attivo', 'pausa'] }),
     }, required: ['id'] } },
+  { name: 'add_discovery', access: 'interests', write: true,
+    description: "Propone di aggiungere alla lista «da scoprire» di un interesse un libro, podcast, video, documentario, film, articolo, corso, luogo, evento o esperienza. Solo cose reali che conosci con certezza, non già in lista.",
+    parameters: { type: 'object', properties: {
+      interest_id: S("Id dell'interesse a cui appartiene"),
+      title: S('Titolo esatto'),
+      type: S('Tipo', { enum: Object.keys(DISCOVERY_TYPES) }),
+      by: S('Autore, regista, conduttore o fonte'),
+      why: S('Perché può piacergli, in una frase'),
+      minutes: I('Durata indicativa in minuti, se ha senso'),
+      link: S('Collegamento, solo se sei sicuro che esista; altrimenti ometti'),
+    }, required: ['interest_id', 'title', 'type'] } },
 ];
 
 export function toolDefs(perms) {
@@ -262,6 +273,8 @@ const EXEC = {
     return { response: { interessi: state.interests.map(i => ({
       id: i.id, nome: i.name, tipo: i.kind, stato: i.status,
       note: perms.notes && i.notes ? i.notes : undefined,
+      da_scoprire: i.items.filter(x => x.status === 'da').map(x => `${x.title}${x.by ? ' – ' + x.by : ''}`),
+      gia_fatti: i.items.filter(x => x.status === 'fatto').map(x => `${x.title}${x.rating === 'piaciuto' ? ' (piaciuto)' : x.rating === 'no' ? ' (non piaciuto)' : ''}`),
     })) } };
   },
 
@@ -282,6 +295,19 @@ const EXEC = {
     if (a.status && a.status !== i.status) lines.push(a.status === 'pausa' ? 'In pausa' : 'Di nuovo attivo');
     if (!lines.length) return { response: { errore: 'Nessuna modifica.' } };
     const p = proposal('update_interest', a, `«${i.name}»`, lines);
+    return { proposal: p, response: { stato: "in attesa di conferma dell'utente" } };
+  },
+
+  add_discovery(a) {
+    const i = findInterest(a.interest_id);
+    if (!i) return { response: { errore: "Nessun interesse con questo id. Se è un argomento nuovo, proponi prima add_interest." } };
+    const x = normDiscovery({ ...a, from: 'claude' });
+    if (!x.title) return { response: { errore: 'Manca il titolo' } };
+    if (i.items.some(o => o.title.toLowerCase() === x.title.toLowerCase())) return { response: { errore: 'Già nella lista di questo interesse' } };
+    const args = { interest_id: i.id, title: x.title, type: x.type, by: x.by, why: x.why, minutes: x.minutes, link: x.link };
+    const p = proposal('add_discovery', args, `Da scoprire · ${i.name}`, [
+      `«${x.title}»`, [DISCOVERY_TYPES[x.type], x.by, x.minutes ? `${x.minutes} min` : ''].filter(Boolean).join(' · '), x.why,
+    ].filter(Boolean));
     return { proposal: p, response: { stato: "in attesa di conferma dell'utente" } };
   },
 };
@@ -336,6 +362,14 @@ export function applyProposal(p) {
       if (a.status) i.status = a.status;
       i.lastTouchedAt = now;
       return 'Interesse aggiornato';
+    }
+    case 'add_discovery': {
+      const i = findInterest(a.interest_id);
+      if (!i) throw new Error("L'interesse non esiste più");
+      if (i.items.some(o => o.title.toLowerCase() === String(a.title).toLowerCase())) return 'Era già nella lista';
+      i.items.push(normDiscovery({ ...a, from: 'claude' }));
+      i.lastTouchedAt = now;
+      return 'Aggiunto alla lista da scoprire';
     }
     default: throw new Error('Proposta sconosciuta');
   }

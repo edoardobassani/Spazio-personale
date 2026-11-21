@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.7.0';
+import { todayISO } from './dates.js?v=2.8.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -136,6 +136,30 @@ export function normInterest(i = {}) {
     createdAt: str(i.createdAt) || nowISO(),
     lastTouchedAt: str(i.lastTouchedAt) || str(i.createdAt) || nowISO(),
     snoozedUntil: isDate(i.snoozedUntil) ? i.snoozedUntil : '',
+    // Cose da scoprire legate all'interesse: libri, podcast, video…
+    items: (Array.isArray(i.items) ? i.items : []).filter(x => x && typeof x === 'object' && str(x.title).trim()).slice(0, 300).map(normDiscovery),
+  };
+}
+
+export const DISCOVERY_TYPES = {
+  libro: 'Libro', podcast: 'Podcast', video: 'Video', documentario: 'Documentario', film: 'Film', articolo: 'Articolo',
+  corso: 'Corso', luogo: 'Luogo da visitare', evento: 'Evento', esperienza: 'Da provare', altro: 'Altro',
+};
+export function normDiscovery(x = {}) {
+  const min = Math.round(Number(x.minutes));
+  return {
+    id: str(x.id) || uid(),
+    title: str(x.title).trim().slice(0, 200),
+    type: DISCOVERY_TYPES[x.type] ? x.type : 'altro',
+    by: str(x.by).trim().slice(0, 120),
+    why: str(x.why).trim().slice(0, 400),
+    link: /^https?:\/\//.test(str(x.link)) ? str(x.link).slice(0, 500) : '',
+    minutes: min > 0 && min < 100000 ? min : 0,
+    status: x.status === 'fatto' ? 'fatto' : 'da',
+    rating: ['piaciuto', 'no'].includes(x.rating) ? x.rating : '',
+    from: x.from === 'claude' ? 'claude' : 'tu',
+    createdAt: str(x.createdAt) || nowISO(),
+    doneAt: str(x.doneAt),
   };
 }
 

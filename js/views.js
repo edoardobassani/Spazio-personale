@@ -1,10 +1,11 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.7.0';
-import * as D from './dates.js?v=2.7.0';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.7.0';
-import { renderFreeTime, renderSaved } from './learn.js?v=2.7.0';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from './store.js?v=2.8.0';
+import * as D from './dates.js?v=2.8.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.8.0';
+import { renderFreeTime, renderSaved, recordFeedback } from './learn.js?v=2.8.0';
+import { CLAUDE_URL } from './bridge.js?v=2.8.0';
 
-export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
+export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false, showDone: false };
 
 export const TYPE = {
   appuntamento: { label: 'Appuntamento', cls: 't-app' },
@@ -595,10 +596,10 @@ export function renderProjects() {
   </section>`;
 }
 
-export function openProjectSheet(id) {
+export function openProjectSheet(id, preset = {}) {
   const p = id ? state.projects.find(x => x.id === id) : null;
   if (id && !p) { toast('Progetto non trovato'); return; }
-  const d = p ? JSON.parse(JSON.stringify(p)) : normProject({});
+  const d = p ? JSON.parse(JSON.stringify(p)) : normProject(preset);
   const steps = d.steps;
   const stepsHTML = () => steps.length ? steps.map(s => `<li class="${s.done ? 'is-done' : ''}">
       <button type="button" class="check${s.done ? ' on' : ''}" data-st-toggle="${s.id}" aria-label="Fatto">${icon('check')}</button>
@@ -611,7 +612,7 @@ export function openProjectSheet(id) {
     <div class="sheet-head"><h2>${p ? 'Progetto' : 'Nuovo progetto'}</h2>
       <button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
     <form class="form" id="pr-form" novalidate>
-      <label class="field"><span>Nome</span><input name="name" value="${p ? esc(d.name) : ''}" maxlength="100" required placeholder="Es. Imparare a fare il pane"></label>
+      <label class="field"><span>Nome</span><input name="name" value="${p || preset.name ? esc(d.name) : ''}" maxlength="100" required placeholder="Es. Imparare a fare il pane"></label>
       <label class="field"><span>Obiettivo</span><input name="goal" value="${esc(d.goal)}" maxlength="200" placeholder="Cosa vuoi ottenere?"></label>
       <label class="field"><span>Descrizione</span><textarea name="description" rows="2" maxlength="1000">${esc(d.description)}</textarea></label>
       <div class="row">
@@ -695,23 +696,38 @@ export function stepDone(id, stepId) {
 
 // ---------- INTERESSI
 
+const todo = i => i.items.filter(x => x.status === 'da');
+
 function interestRow(i) {
+  const n = todo(i).length;
+  const sub = n ? `${n} da scoprire` : (i.notes ? i.notes.split('\n')[0] : '');
   return `<div class="item interest">
-    <button class="item-main" data-action="open-interest" data-id="${i.id}">
+    <a class="item-main" href="#interesse/${i.id}">
       <strong>${esc(i.name)}</strong>
-      ${i.notes ? `<small>${esc(i.notes.split('\n')[0])}</small>` : ''}
-    </button>
+      ${sub ? `<small>${esc(sub)}</small>` : ''}
+    </a>
     ${i.status === 'pausa'
       ? `<button class="btn small ghost" data-action="resume-interest" data-id="${i.id}">Riprendi</button>`
-      : `<button class="icon-btn tiny" data-action="pause-interest" data-id="${i.id}" aria-label="Metti in pausa">${icon('pause')}</button>`}
+      : `<span class="go" aria-hidden="true">${icon('right')}</span>`}
   </div>`;
 }
+
+// Richiesta già pronta per l'assistente su Claude
+function discoverRequest(i) {
+  const n = i ? 5 : 6;
+  return i
+    ? `Proponimi ${n} cose da scoprire sull'interesse «${i.name}» (id ${i.id}): libri, podcast, video, documentari, articoli o esperienze, mescolando i tipi. Tieni conto di cosa ho già in lista e di cosa mi è piaciuto o no.`
+    : `Guarda i miei interessi e proponimi ${n} cose da scoprire, distribuite tra gli interessi attivi, tenendo conto di cosa ho già in lista e di cosa mi è piaciuto o no.`;
+}
+const claudeLink = (req, label, cls = 'btn primary') =>
+  `<a class="${cls} bridge-go" href="${CLAUDE_URL}" target="_blank" rel="noopener" data-action="bridge-go" data-request="${esc(req)}" data-with="interests">${icon('spark', 'xs')} ${label}</a>`;
 
 export function renderInterests() {
   const act = state.interests.filter(i => i.status === 'attivo');
   const stable = act.filter(i => i.kind === 'stabile');
   const cur = act.filter(i => i.kind === 'curiosita');
   const paused = state.interests.filter(i => i.status === 'pausa');
+  const next = act.flatMap(i => todo(i).map(x => ({ i, x }))).sort((a, b) => b.x.createdAt.localeCompare(a.x.createdAt)).slice(0, 3);
   return `<section class="view">
     <header class="page-head"><h1>Interessi</h1></header>
     <form class="add-interest" data-form="interest">
@@ -722,6 +738,8 @@ export function renderInterests() {
       </div>
       <button class="btn primary">Aggiungi</button>
     </form>
+    ${act.length ? `<div class="discover-all">${claudeLink(discoverRequest(null), 'Scopri qualcosa con Claude', 'btn wide')}</div>` : ''}
+    ${next.length ? `<h2 class="sec">Ultime cose da scoprire</h2><div class="list">${next.map(({ i, x }) => discoveryRow(i, x, true)).join('')}</div>` : ''}
     <h2 class="sec">Interessi stabili</h2>
     ${stable.length ? `<div class="list">${stable.map(interestRow).join('')}</div>` : empty('Ancora nessuno.', 'Gli argomenti che ti accompagnano da tempo.')}
     <h2 class="sec">Curiosità del momento</h2>
@@ -729,11 +747,170 @@ export function renderInterests() {
     ${paused.length ? `<h2 class="sec">In pausa</h2><div class="list">${paused.map(interestRow).join('')}</div>` : ''}
     ${renderSaved()}
     <button class="btn profile-btn" data-action="open-profile">${icon('spark', 'xs')} Cosa ho imparato di te</button>
-    <div class="info-card">
-      <strong>Scoperta di contenuti</strong>
-      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: Claude riceve i tuoi interessi e ti propone cosa aggiungere.</p>
-    </div>
   </section>`;
+}
+
+const searchUrl = x => `https://www.google.com/search?q=${encodeURIComponent([x.title, x.by].filter(Boolean).join(' '))}`;
+const dur = m => !m ? '' : m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : m < 1440 ? `${m / 60} h` : '';
+
+function discoveryRow(i, x, showInterest = false) {
+  const meta = [DISCOVERY_TYPES[x.type], x.by, dur(x.minutes), showInterest && i.name].filter(Boolean).map(esc).join(' · ');
+  const btn = (action, ic, label, extra = '') => `<button class="icon-btn tiny" data-action="${action}" data-id="${i.id}" data-item="${x.id}" aria-label="${label}"${extra}>${icon(ic)}</button>`;
+  const done = x.status === 'fatto';
+  return `<div class="item disc${done ? ' is-done' : ''}${x.from === 'claude' ? ' from-ai' : ''}">
+    ${done ? '' : `<button class="check" data-action="disc-done" data-id="${i.id}" data-item="${x.id}" aria-label="Fatto: visto, letto o ascoltato">${icon('check')}</button>`}
+    <div class="disc-main">
+      <button class="disc-title" data-action="disc-edit" data-id="${i.id}" data-item="${x.id}">${esc(x.title)}</button>
+      <small>${meta}${x.from === 'claude' ? ` · <span class="ai-tag">${icon('spark', 'xs')} Claude</span>` : ''}</small>
+      ${x.why && !done ? `<small class="why">${esc(x.why)}</small>` : ''}
+      ${done ? `<span class="rate">
+        <button class="pill${x.rating === 'piaciuto' ? ' on' : ''}" data-action="disc-rate" data-id="${i.id}" data-item="${x.id}" data-v="piaciuto">Mi è piaciuto</button>
+        <button class="pill${x.rating === 'no' ? ' on' : ''}" data-action="disc-rate" data-id="${i.id}" data-item="${x.id}" data-v="no">Non fa per me</button></span>` : ''}
+    </div>
+    <span class="disc-actions">
+      <a class="icon-btn tiny" href="${esc(x.link || searchUrl(x))}" target="_blank" rel="noopener" aria-label="${x.link ? 'Apri il collegamento' : 'Cerca sul web'}">${icon(x.link ? 'right' : 'search')}</a>
+      ${done ? '' : btn('disc-plan', 'calendar', 'Metti in agenda')}
+    </span>
+  </div>`;
+}
+
+export function renderInterest(id) {
+  const i = state.interests.find(x => x.id === id);
+  if (!i) return `<section class="view"><a class="back" href="#interessi">${icon('left', 'xs')} Interessi</a>${empty('Interesse non trovato.', 'Forse è stato eliminato.')}</section>`;
+  const list = todo(i).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const done = i.items.filter(x => x.status === 'fatto').sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+  return `<section class="view interest-page">
+    <a class="back" href="#interessi">${icon('left', 'xs')} Interessi</a>
+    <header class="page-head"><h1>${esc(i.name)}</h1>
+      <button class="btn small ghost" data-action="open-interest" data-id="${i.id}">Modifica</button></header>
+    <p class="intro">${i.kind === 'curiosita' ? 'Curiosità del momento' : 'Interesse stabile'}${i.status === 'pausa' ? ' · in pausa' : ''}</p>
+    ${i.notes ? `<div class="info-card notes-card"><p>${esc(i.notes).replace(/\n/g, '<br>')}</p></div>` : ''}
+    <div class="interest-cta">
+      ${claudeLink(discoverRequest(i), 'Scopri con Claude', 'btn primary wide')}
+      <button class="btn ghost wide" data-action="interest-project" data-id="${i.id}">${icon('layers', 'xs')} Trasforma in progetto</button>
+    </div>
+    <form class="add-disc" data-form="discovery" data-id="${i.id}">
+      <input name="what" placeholder="Un libro, un podcast, un posto…" maxlength="200" autocomplete="off" aria-label="Cosa vuoi scoprire">
+      <select name="dtype" aria-label="Tipo">${Object.entries(DISCOVERY_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <button class="icon-btn solid" aria-label="Aggiungi">${icon('plus')}</button>
+    </form>
+    <h2 class="sec">Da scoprire</h2>
+    ${list.length ? `<div class="list">${list.map(x => discoveryRow(i, x)).join('')}</div>` : empty('La lista è vuota.', 'Aggiungi qualcosa qui sopra o chiedi idee a Claude.')}
+    ${done.length ? `<button class="sec-toggle" data-action="toggle-done-list">${ui.showDone ? 'Nascondi' : 'Mostra'} già fatti (${done.length})</button>
+      ${ui.showDone ? `<div class="list">${done.map(x => discoveryRow(i, x)).join('')}</div>` : ''}` : ''}
+  </section>`;
+}
+
+const findDisc = (id, itemId) => {
+  const i = state.interests.find(x => x.id === id);
+  const x = i && i.items.find(o => o.id === itemId);
+  return x ? { i, x } : null;
+};
+const discTags = (i, x) => [i.name.toLowerCase(), DISCOVERY_TYPES[x.type].toLowerCase()];
+
+export function addDiscovery(id, title, type) {
+  const i = state.interests.find(x => x.id === id);
+  const t = String(title || '').trim();
+  if (!i) return false;
+  if (!t) { toast('Scrivi cosa vuoi scoprire'); return false; }
+  if (i.items.some(x => x.title.toLowerCase() === t.toLowerCase())) { toast('È già nella lista'); return false; }
+  i.items.push(normDiscovery({ title: t, type }));
+  i.lastTouchedAt = new Date().toISOString();
+  commit(); toast('Aggiunto alla lista');
+  return true;
+}
+
+export function discoveryDone(id, itemId) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  f.x.status = 'fatto'; f.x.doneAt = new Date().toISOString();
+  f.i.lastTouchedAt = f.x.doneAt;
+  ui.showDone = true;
+  commit(); toast('Fatto! Dimmi se ti è piaciuto');
+}
+
+export function discoveryUndo(id, itemId) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  f.x.status = 'da'; f.x.doneAt = ''; f.x.rating = '';
+  commit();
+}
+
+export function discoveryRate(id, itemId, v) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  const value = f.x.rating === v ? '' : v; // ritocco = tolgo il giudizio
+  f.x.rating = value;
+  if (value) recordFeedback({ title: f.x.title, kind: 'scoperta', tags: discTags(f.i, f.x) }, value === 'piaciuto' ? 'scelto' : 'no');
+  commit();
+}
+
+export function discoveryDelete(id, itemId) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  f.i.items = f.i.items.filter(x => x.id !== itemId);
+  commit(); toast('Tolto dalla lista');
+}
+
+export function discoveryPlan(id, itemId) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  const { x, i } = f;
+  const notes = [x.by && `${DISCOVERY_TYPES[x.type]} di ${x.by}`, x.why, x.link, `Interesse: ${i.name}`].filter(Boolean).join('\n');
+  const preset = { title: x.title, type: x.type === 'evento' ? 'appuntamento' : 'attivita', date: D.todayISO(), notes, reminders: [] };
+  if (x.minutes && x.minutes <= 600) { preset.start = '21:00'; const e = 21 * 60 + x.minutes; if (e < 24 * 60) preset.end = `${D.pad(Math.floor(e / 60))}:${D.pad(e % 60)}`; }
+  openEventSheet(null, preset);
+}
+
+export function openDiscoverySheet(id, itemId) {
+  const f = findDisc(id, itemId);
+  if (!f) return;
+  const { i, x } = f;
+  openSheet(`
+    <div class="sheet-head"><h2>Da scoprire</h2><button class="icon-btn" data-close aria-label="Chiudi">${icon('close')}</button></div>
+    <form class="form" id="dc-form" novalidate>
+      <label class="field"><span>Titolo</span><input name="what" value="${esc(x.title)}" maxlength="200" required></label>
+      <div class="row">
+        <label class="field"><span>Tipo</span><select name="dtype">${Object.entries(DISCOVERY_TYPES).map(([k, v]) => `<option value="${k}"${x.type === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label class="field"><span>Autore o fonte</span><input name="by" value="${esc(x.by)}" maxlength="120"></label>
+      </div>
+      <label class="field"><span>Perché</span><textarea name="why" rows="2" maxlength="400">${esc(x.why)}</textarea></label>
+      <div class="row">
+        <label class="field"><span>Collegamento</span><input name="link" type="url" value="${esc(x.link)}" placeholder="https://…" maxlength="500"></label>
+        <label class="field"><span>Durata (minuti)</span><input name="minutes" type="number" min="0" inputmode="numeric" value="${x.minutes || ''}"></label>
+      </div>
+      <label class="field"><span>Interesse</span><select name="interest">${state.interests.map(o => `<option value="${o.id}"${o.id === i.id ? ' selected' : ''}>${esc(o.name)}</option>`).join('')}</select></label>
+      <div class="actions">
+        <button type="button" class="btn ghost danger" data-del>Togli</button>
+        ${x.status === 'fatto' ? '<button type="button" class="btn ghost" data-undo>Non ancora fatto</button>' : ''}
+        <button class="btn primary">Salva</button>
+      </div>
+    </form>`, sheet => {
+    const fm = sheet.querySelector('#dc-form');
+    sheet.querySelector('[data-del]').addEventListener('click', () => { closeSheet(); discoveryDelete(i.id, x.id); });
+    const undo = sheet.querySelector('[data-undo]');
+    if (undo) undo.addEventListener('click', () => { closeSheet(); discoveryUndo(i.id, x.id); });
+    fm.addEventListener('submit', e => {
+      e.preventDefault();
+      if (!fm.what.value.trim()) return;
+      Object.assign(x, normDiscovery({ ...x, title: fm.what.value, type: fm.dtype.value, by: fm.by.value, why: fm.why.value, link: fm.link.value.trim(), minutes: fm.minutes.value }));
+      if (fm.interest.value !== i.id) {
+        const to = state.interests.find(o => o.id === fm.interest.value);
+        if (to) { i.items = i.items.filter(o => o.id !== x.id); to.items.push(x); }
+      }
+      closeSheet(); commit(); toast('Salvato');
+    });
+  });
+}
+
+export function interestToProject(id) {
+  const i = state.interests.find(x => x.id === id);
+  if (!i) return;
+  const verb = { libro: 'Leggere', podcast: 'Ascoltare', video: 'Guardare', documentario: 'Guardare', film: 'Guardare', articolo: 'Leggere', corso: 'Seguire', luogo: 'Visitare', evento: 'Andare a', esperienza: 'Provare', altro: '' };
+  openProjectSheet(null, {
+    name: i.name, description: i.notes,
+    steps: todo(i).slice(0, 8).map(x => ({ text: `${verb[x.type] ? verb[x.type] + ' ' : ''}${x.title}`.trim() })),
+  });
 }
 
 export function openInterestSheet(id) {
@@ -759,9 +936,11 @@ export function openInterestSheet(id) {
     </form>`, sheet => {
     const f = sheet.querySelector('#in-form');
     sheet.querySelector('[data-del]').addEventListener('click', () => {
-      if (!confirm(`Eliminare «${i.name}»?`)) return;
+      if (!confirm(`Eliminare «${i.name}»${i.items.length ? ' e la sua lista di cose da scoprire' : ''}?`)) return;
       state.interests = state.interests.filter(x => x.id !== i.id);
-      closeSheet(); commit(); toast('Interesse eliminato');
+      closeSheet();
+      if (location.hash.startsWith('#interesse/')) location.hash = '#interessi';
+      commit(); toast('Interesse eliminato');
     });
     f.addEventListener('submit', e => {
       e.preventDefault();
@@ -836,7 +1015,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.7.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.8.0</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');
@@ -937,8 +1116,11 @@ export function searchAll(query) {
     kind: 'interest', id: i.id, title: i.name, sub: i.kind === 'curiosita' ? 'Curiosità del momento' : 'Interesse',
     extra: i.notes && words.some(w => foldText(i.notes).includes(w)) ? snippet(i.notes, words) : '',
   }));
+  const dc = state.interests.flatMap(i => i.items.filter(x => hit([x.title, x.by, x.why])).map(x => ({
+    kind: 'interest', id: i.id, title: x.title, sub: `${DISCOVERY_TYPES[x.type]}${x.by ? ' · ' + x.by : ''} · ${i.name}${x.status === 'fatto' ? ' · fatto' : ''}`, extra: '',
+  })));
   const sv = state.saved.filter(x => hit([x.title, x.detail])).map(x => ({ kind: 'saved', id: x.id, title: x.title, sub: 'Salvato per dopo', extra: x.detail ? snippet(x.detail, words) : '' }));
-  const groups = [['Impegni', ev], ['Progetti', pr], ['Interessi', it], ['Salvati per dopo', sv]].filter(([, l]) => l.length);
+  const groups = [['Impegni', ev], ['Progetti', pr], ['Interessi', it], ['Da scoprire', dc], ['Salvati per dopo', sv]].filter(([, l]) => l.length);
   return { words, groups };
 }
 
@@ -966,7 +1148,7 @@ export function openSearch() {
       const { kind, id, date } = r.dataset;
       if (kind === 'event') openEventSheet(id, {}, [], date);
       else if (kind === 'project') openProjectSheet(id);
-      else if (kind === 'interest') openInterestSheet(id);
+      else if (kind === 'interest') { closeSheet(); location.hash = `#interesse/${id}`; }
       else { closeSheet(); location.hash = '#interessi'; }
     });
     setTimeout(() => input.focus(), 60);

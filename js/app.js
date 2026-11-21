@@ -1,16 +1,17 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.7.0';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.7.0';
-import { parseQuick } from './parse.js?v=2.7.0';
-import * as V from './views.js?v=2.7.0';
-import * as AI from './ai/assistant.js?v=2.7.0';
-import * as LEARN from './learn.js?v=2.7.0';
-import * as BR from './bridge.js?v=2.7.0';
+import { load, onChange } from './store.js?v=2.8.0';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.8.0';
+import { parseQuick } from './parse.js?v=2.8.0';
+import * as V from './views.js?v=2.8.0';
+import * as AI from './ai/assistant.js?v=2.8.0';
+import * as LEARN from './learn.js?v=2.8.0';
+import * as BR from './bridge.js?v=2.8.0';
 
 const ROUTES = {
   oggi: V.renderToday,
   impegni: V.renderAgenda,
   interessi: V.renderInterests,
+  interesse: V.renderInterest, // #interesse/<id>
   progetti: V.renderProjects,
   assistente: BR.renderBridge,
   chat: AI.renderAssistant, // assistente con chiave API, facoltativo
@@ -18,21 +19,22 @@ const ROUTES = {
 const main = document.getElementById('main');
 
 const route = () => {
-  const r = location.hash.replace('#', '');
+  const r = location.hash.replace('#', '').split('/')[0];
   return ROUTES[r] ? r : 'oggi';
 };
+const param = () => decodeURIComponent(location.hash.split('/')[1] || '');
 
 function render() {
   const r = route();
   stopDictation(); // il testo dettato fin qui resta nel campo
   // Conserva quello che stavi scrivendo se la schermata si aggiorna
   const typing = [...main.querySelectorAll('[data-form] [name=q]')].map(el => [el.closest('[data-form]').dataset.form, el.value, el === document.activeElement]);
-  main.innerHTML = ROUTES[r]();
+  main.innerHTML = ROUTES[r](param());
   for (const [form, value, focused] of typing) {
     const el = main.querySelector(`[data-form=${form}] [name=q]`);
     if (el && value) { el.value = value; if (focused) el.focus(); }
   }
-  const tab = r === 'chat' ? 'assistente' : r;
+  const tab = { chat: 'assistente', interesse: 'interessi' }[r] || r;
   document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.route === tab));
   if (r === 'chat') AI.afterRender();
 }
@@ -75,6 +77,14 @@ const actions = {
   'step-done': el => V.stepDone(el.dataset.id, el.dataset.step),
   'toggle-archive': () => { V.ui.archive = !V.ui.archive; render(); },
   'open-interest': el => V.openInterestSheet(el.dataset.id),
+  'disc-done': el => V.discoveryDone(el.dataset.id, el.dataset.item),
+  'disc-undo': el => V.discoveryUndo(el.dataset.id, el.dataset.item),
+  'disc-rate': el => V.discoveryRate(el.dataset.id, el.dataset.item, el.dataset.v),
+  'disc-del': el => V.discoveryDelete(el.dataset.id, el.dataset.item),
+  'disc-plan': el => V.discoveryPlan(el.dataset.id, el.dataset.item),
+  'disc-edit': el => V.openDiscoverySheet(el.dataset.id, el.dataset.item),
+  'interest-project': el => V.interestToProject(el.dataset.id),
+  'toggle-done-list': () => { V.ui.showDone = !V.ui.showDone; render(); },
   'pause-interest': el => V.setInterestStatus(el.dataset.id, 'pausa'),
   'resume-interest': el => V.setInterestStatus(el.dataset.id, 'attivo'),
   'snooze-project': el => V.snooze('project', el.dataset.id),
@@ -122,6 +132,9 @@ document.addEventListener('submit', e => {
   if (f.dataset.form === 'quick') handleQuick(f.q.value);
   if (f.dataset.form === 'ai-key') AI.connect(f.key.value, f.provider ? f.provider.value : undefined);
   if (f.dataset.form === 'ai-chat') { const t = f.q.value; f.q.value = ''; AI.send(t); }
+  if (f.dataset.form === 'discovery') {
+    if (V.addDiscovery(f.dataset.id, f.what.value, f.dtype.value)) f.what.value = '';
+  }
   if (f.dataset.form === 'interest') {
     if (V.addInterest(f.name.value, f.querySelector('input[name=kind]:checked').value)) f.name.value = '';
   }

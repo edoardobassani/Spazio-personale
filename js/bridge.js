@@ -1,12 +1,12 @@
 // Ponte con l'assistente su Claude (un artifact su claude.ai).
 // Andata: Spazio copia negli appunti i dati scelti e apre l'assistente.
 // Ritorno: l'assistente copia le proposte; Spazio le legge, le controlla e le fa confermare.
-import { state, commit } from './store.js?v=2.7.0';
-import * as D from './dates.js?v=2.7.0';
-import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.7.0';
-import { items, recLabel, remindersLabel } from './views.js?v=2.7.0';
-import { learnedSummary } from './learn.js?v=2.7.0';
-import { runTool, applyProposal } from './ai/tools.js?v=2.7.0';
+import { state, commit } from './store.js?v=2.8.0';
+import * as D from './dates.js?v=2.8.0';
+import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.8.0';
+import { items, recLabel, remindersLabel } from './views.js?v=2.8.0';
+import { learnedSummary } from './learn.js?v=2.8.0';
+import { runTool, applyProposal } from './ai/tools.js?v=2.8.0';
 
 export const CLAUDE_URL = 'https://claude.ai/artifact/AekZm9tnac6HCS7h1mpjUo';
 const OUT_HEAD = 'SPAZIO>CLAUDE';
@@ -27,8 +27,8 @@ export const setDraft = t => { ui.draft = t; };
 
 const WEEK = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 
-export function buildPackage(request) {
-  const o = opts();
+export function buildPackage(request, force = {}) {
+  const o = { ...opts(), ...force };
   const t = D.todayISO();
   const now = new Date();
   const d = state.settings.day;
@@ -68,7 +68,16 @@ export function buildPackage(request) {
       passaggi: p.steps.map(s => ({ id: s.id, testo: s.text, fatto: s.done })),
       descrizione: notes && p.description ? p.description : undefined, note: notes && p.notes ? p.notes : undefined,
     }));
-    pkg.interessi = state.interests.map(i => ({ id: i.id, nome: i.name, tipo: i.kind, stato: i.status, note: notes && i.notes ? i.notes : undefined }));
+  }
+  if (o.projects || o.interests) {
+    pkg.interessi = state.interests.map(i => {
+      const fatti = i.items.filter(x => x.status === 'fatto').slice(-25);
+      return {
+        id: i.id, nome: i.name, tipo: i.kind, stato: i.status, note: notes && i.notes ? i.notes : undefined,
+        da_scoprire: i.items.filter(x => x.status === 'da').slice(-40).map(x => `${x.title}${x.by ? ' – ' + x.by : ''} (${x.type})`),
+        gia_fatti: fatti.length ? fatti.map(x => `${x.title}${x.by ? ' – ' + x.by : ''}${x.rating === 'piaciuto' ? ': gli è piaciuto' : x.rating === 'no' ? ': non gli è piaciuto' : ''}`) : undefined,
+      };
+    });
     if (state.saved.length) pkg.salvati_per_dopo = state.saved.slice(0, 15).map(s => s.title);
   }
   return `${OUT_HEAD} 1\n${JSON.stringify(pkg)}`;
@@ -85,8 +94,10 @@ function counts() {
 
 // Copia i dati e lascia proseguire il collegamento verso Claude (stesso tocco)
 export function goToClaude(link) {
-  const form = link.closest('main').querySelector('[data-form=bridge]');
-  const text = buildPackage(form ? form.q.value : '');
+  // Richiesta pronta sul pulsante (per esempio «Scopri con Claude») oppure scritta nel campo
+  const preset = link.dataset.request;
+  const form = preset ? null : link.closest('main').querySelector('[data-form=bridge]');
+  const text = buildPackage(preset || (form ? form.q.value : ''), link.dataset.with === 'interests' ? { interests: true } : {});
   const ok = navigator.clipboard && navigator.clipboard.writeText
     ? navigator.clipboard.writeText(text).then(() => true, () => false) : Promise.resolve(false);
   ls.set(PENDING, { at: Date.now() });
