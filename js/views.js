@@ -1,8 +1,8 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.6.1';
-import * as D from './dates.js?v=2.6.1';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.6.1';
-import { renderFreeTime, renderSaved } from './learn.js?v=2.6.1';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest } from './store.js?v=2.7.0';
+import * as D from './dates.js?v=2.7.0';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.7.0';
+import { renderFreeTime, renderSaved } from './learn.js?v=2.7.0';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false };
 
@@ -731,7 +731,7 @@ export function renderInterests() {
     <button class="btn profile-btn" data-action="open-profile">${icon('spark', 'xs')} Cosa ho imparato di te</button>
     <div class="info-card">
       <strong>Scoperta di contenuti</strong>
-      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: conosce i tuoi interessi, se gli dai il permesso, e può cercare sul web.</p>
+      <p>Per farti consigliare libri, podcast, documentari o un argomento da approfondire, chiedilo all'<a href="#assistente">Assistente</a>: Claude riceve i tuoi interessi e ti propone cosa aggiungere.</p>
     </div>
   </section>`;
 }
@@ -836,7 +836,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.6.1</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.7.0</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');

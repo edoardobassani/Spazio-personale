@@ -1,10 +1,10 @@
 // Tempo libero, proposte, feedback e quello che l'app impara dalle tue scelte.
 // Tutto è calcolato dai tuoi dati e si può vedere, correggere e cancellare dal profilo.
-import { state, commit, uid } from './store.js?v=2.6.1';
-import * as D from './dates.js?v=2.6.1';
-import { esc, icon, toast, openSheet } from './ui.js?v=2.6.1';
-import { items, openEventSheet, openSettings } from './views.js?v=2.6.1';
-import { askJSON, isConnected } from './ai/assistant.js?v=2.6.1';
+import { state, commit, uid } from './store.js?v=2.7.0';
+import * as D from './dates.js?v=2.7.0';
+import { esc, icon, toast, openSheet } from './ui.js?v=2.7.0';
+import { items, openEventSheet, openSettings } from './views.js?v=2.7.0';
+import { askJSON, isConnected } from './ai/assistant.js?v=2.7.0';
 
 const L = () => state.settings.learning;
 const ui = { day: '', busy: false };
@@ -351,7 +351,8 @@ export function renderFreeTime() {
       <p class="slots">${slots.length ? slots.map(s => `<span>${s.start}–${s.end}</span>`).join('') : 'Nessun tempo libero in questo giorno.'}
         <button class="link" data-action="open-day-settings">Modifica orari</button></p>
       <button class="btn primary propose" data-action="propose"${ui.busy || !slots.length ? ' disabled' : ''}>${icon('spark', 'xs')} ${ui.busy ? 'Ci penso…' : cur ? 'Altre proposte' : 'Proponimi qualcosa'}</button>
-      ${!conn ? `<p class="hint">Proposte semplici dai tuoi progetti e interessi. <a href="#assistente">Collega l'assistente</a> per proposte su misura.</p>` : ''}
+      ${slots.length ? `<button class="btn ghost ask-claude" data-action="ask-claude" data-text="${esc(`Cosa potrei fare ${opts.find(o => o.date === ui.day).label.toLowerCase()} nel tempo libero? Sono libero ${slots.map(s => `dalle ${s.start} alle ${s.end}`).join(', ')}.`)}">${icon('spark', 'xs')} Chiedi a Claude</button>` : ''}
+      ${!conn ? `<p class="hint">Proposte semplici dai tuoi progetti e interessi. <a href="#chat">Collega un assistente con chiave</a> per proposte automatiche, oppure tocca Chiedi a Claude.</p>` : ''}
     </div>
     ${cur && cur.items.length ? `<div class="prop-list">${cur.items.map(proposalCard).join('')}</div>
       <p class="hint center">${cur.source === 'ai' ? 'Proposte dell\'assistente' : 'Proposte automatiche'}. Le tue risposte migliorano le prossime.</p>` : ''}`;

@@ -1,17 +1,19 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.6.1';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.6.1';
-import { parseQuick } from './parse.js?v=2.6.1';
-import * as V from './views.js?v=2.6.1';
-import * as AI from './ai/assistant.js?v=2.6.1';
-import * as LEARN from './learn.js?v=2.6.1';
+import { load, onChange } from './store.js?v=2.7.0';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.7.0';
+import { parseQuick } from './parse.js?v=2.7.0';
+import * as V from './views.js?v=2.7.0';
+import * as AI from './ai/assistant.js?v=2.7.0';
+import * as LEARN from './learn.js?v=2.7.0';
+import * as BR from './bridge.js?v=2.7.0';
 
 const ROUTES = {
   oggi: V.renderToday,
   impegni: V.renderAgenda,
   interessi: V.renderInterests,
   progetti: V.renderProjects,
-  assistente: AI.renderAssistant,
+  assistente: BR.renderBridge,
+  chat: AI.renderAssistant, // assistente con chiave API, facoltativo
 };
 const main = document.getElementById('main');
 
@@ -30,13 +32,24 @@ function render() {
     const el = main.querySelector(`[data-form=${form}] [name=q]`);
     if (el && value) { el.value = value; if (focused) el.focus(); }
   }
-  document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.route === r));
-  if (r === 'assistente') AI.afterRender();
+  const tab = r === 'chat' ? 'assistente' : r;
+  document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.route === tab));
+  if (r === 'chat') AI.afterRender();
 }
 AI.setRender(render);
 
 let lastRoute = null;
+// Arrivo dal pulsante «Apri Spazio» dell'assistente su Claude
+function handleImportLink() {
+  if (location.hash !== '#importa') return false;
+  history.replaceState(null, '', '#assistente');
+  render();
+  BR.openImport();
+  return true;
+}
+
 window.addEventListener('hashchange', () => {
+  if (handleImportLink()) return;
   stopDictation();
   closeSheet();
   render();
@@ -68,6 +81,7 @@ const actions = {
   'snooze-interest': el => V.snooze('interest', el.dataset.id),
   ...AI.actions,
   ...LEARN.actions,
+  ...BR.actions,
   voice: el => dictate(el.closest('form').q, el),
 };
 
@@ -78,7 +92,12 @@ function localToday() {
 
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
-  if (el && actions[el.dataset.action]) { e.preventDefault(); actions[el.dataset.action](el); return; }
+  if (el && actions[el.dataset.action]) {
+    // «Apri in Claude» è un vero collegamento: deve aprirsi dopo aver copiato i dati
+    if (el.dataset.action !== 'bridge-go') e.preventDefault();
+    actions[el.dataset.action](el);
+    return;
+  }
   if (e.target.closest('[data-close]')) closeSheet();
 });
 
@@ -133,6 +152,7 @@ const info = load();
 onChange(ok => { if (!ok) toast('Non sono riuscito a salvare: lo spazio del browser potrebbe essere pieno', 'bad'); render(); });
 lastRoute = route();
 render();
+handleImportLink();
 if (info.migrated) toast('Ho importato i dati della versione precedente');
 if (info.error) toast(info.error, 'bad');
 
@@ -143,6 +163,7 @@ document.addEventListener('visibilitychange', () => {
     const d = localToday();
     if (d !== lastDay) { lastDay = d; V.ui.cursor = V.ui.selected = d; }
     if (!sheet.open) render();
+    BR.maybePromptReturn();
   }
 });
 setInterval(() => { if (document.visibilityState === 'visible' && !sheet.open && !isDictating()) render(); }, 5 * 60 * 1000);

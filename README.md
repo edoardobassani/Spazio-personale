@@ -1,4 +1,4 @@
-# Spazio personale — v2.5
+# Spazio personale — v2.7
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -41,7 +41,14 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 - Tutto è visibile: puoi far dimenticare una singola cosa, cancellare tutto o mettere in pausa l'apprendimento.
 - Le proposte e l'assistente lo usano come indicazione, se gli dai il permesso.
 
-**Assistente AI (Gemini, OpenRouter, Claude oppure OpenAI)**
+**Assistente su Claude (scheda Assistente)**
+- Scrivi o detti cosa ti serve e tocca **Apri in Claude**: Spazio copia i tuoi dati (impegni dei prossimi giorni, progetti, interessi, orari della giornata) e apre l'artifact «Assistente di Spazio» su Claude, che usa il tuo account Claude.
+- Nell'artifact tieni premuto e scegli **Incolla**: Claude legge i dati e risponde. Puoi allegare uno screenshot (per esempio un invito) per farne un impegno.
+- Spunta le proposte che vuoi e tocca **Manda a Spazio**, poi **Apri Spazio** e incolla: Spazio ricontrolla ogni proposta sui dati aggiornati, segnala quelle non valide o già aggiunte e salva solo quelle che confermi.
+- Scegli cosa mandare (impegni, progetti, note); le note restano escluse se non le attivi. Nessuna chiave API.
+- L'uso conta sui limiti del tuo piano Claude.
+
+**Assistente con chiave API (Gemini, OpenRouter, Claude oppure OpenAI)** — si apre dal link in fondo alla scheda Assistente
 - Si collega il fornitore che si preferisce, anche più di uno, e si passa dall'uno all'altro dalle impostazioni dell'assistente. Ogni fornitore ha la sua chiave e il suo modello.
 - Conversazione scritta o dettata, con lettura facoltativa delle risposte ad alta voce (voce del telefono).
 - Legge agenda, progetti e interessi, solo se gli dai il permesso. Le note personali sono escluse se non le attivi.
@@ -80,6 +87,7 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 | `js/dates.js` | Calcoli su date e ripetizioni |
 | `js/parse.js` | Interpretazione delle frasi dell'inserimento rapido |
 | `js/learn.js` | Tempo libero, proposte, feedback, profilo appreso |
+| `js/bridge.js` | Ponte con l'artifact di Claude: prepara i dati da copiare e importa le proposte |
 | `js/ai/assistant.js` | Conversazione, proposte, voce, impostazioni dell'assistente |
 | `js/ai/providers.js` | Elenco dei fornitori AI e istruzioni per collegarli |
 | `js/ai/gemini.js` | Collegamento a Google Gemini |

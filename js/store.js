@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.6.1';
+import { todayISO } from './dates.js?v=2.7.0';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -63,7 +63,7 @@ function defaults() {
     projects: [],
     interests: [],
     feedback: [], saved: [], proposals: [],
-    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 }, ai: defaultAI(), day: normDay(), learning: { enabled: true, forgotten: [] } },
+    settings: { reminders: { appuntamento: 1440, attivita: 60, scadenza: 1440 }, ai: defaultAI(), day: normDay(), learning: { enabled: true, forgotten: [] }, bridge: { events: true, projects: true, notes: false } },
     meta: { createdAt: nowISO(), lastExport: null, migratedFromV1: false },
   };
 }
@@ -188,6 +188,12 @@ export function normalize(raw) {
       reminders: { ...d.settings.reminders, ...(s.settings && s.settings.reminders) },
       ai: normAI(s.settings && s.settings.ai),
       day: normDay(s.settings && s.settings.day),
+      // cosa mandare all'assistente su Claude
+      bridge: {
+        events: !(s.settings && s.settings.bridge && s.settings.bridge.events === false),
+        projects: !(s.settings && s.settings.bridge && s.settings.bridge.projects === false),
+        notes: !!(s.settings && s.settings.bridge && s.settings.bridge.notes === true),
+      },
       learning: {
         enabled: !(s.settings && s.settings.learning && s.settings.learning.enabled === false),
         forgotten: (s.settings && s.settings.learning && Array.isArray(s.settings.learning.forgotten) ? s.settings.learning.forgotten : []).map(str).slice(0, 200),
