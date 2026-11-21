@@ -1,12 +1,12 @@
 // Ponte con l'assistente su Claude (un artifact su claude.ai).
 // Andata: Spazio copia negli appunti i dati scelti e apre l'assistente.
 // Ritorno: l'assistente copia le proposte; Spazio le legge, le controlla e le fa confermare.
-import { state, commit } from './store.js?v=2.8.0';
-import * as D from './dates.js?v=2.8.0';
-import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.8.0';
-import { items, recLabel, remindersLabel } from './views.js?v=2.8.0';
-import { learnedSummary } from './learn.js?v=2.8.0';
-import { runTool, applyProposal } from './ai/tools.js?v=2.8.0';
+import { state, commit } from './store.js?v=2.8.1';
+import * as D from './dates.js?v=2.8.1';
+import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.8.1';
+import { items, recLabel, remindersLabel } from './views.js?v=2.8.1';
+import { learnedSummary } from './learn.js?v=2.8.1';
+import { runTool, applyProposal } from './ai/tools.js?v=2.8.1';
 
 export const CLAUDE_URL = 'https://claude.ai/artifact/AekZm9tnac6HCS7h1mpjUo';
 const OUT_HEAD = 'SPAZIO>CLAUDE';

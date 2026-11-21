@@ -1,10 +1,10 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from '../store.js?v=2.8.0';
-import * as D from '../dates.js?v=2.8.0';
-import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.8.0';
-import { webSearch } from './search.js?v=2.8.0';
+import { state, uid, touch, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from '../store.js?v=2.8.1';
+import * as D from '../dates.js?v=2.8.1';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.8.1';
+import { webSearch } from './search.js?v=2.8.1';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
@@ -80,7 +80,7 @@ const DEFS = [
       id: S("Id dell'interesse"), kind: S('Tipo', { enum: ['stabile', 'curiosita'] }), status: S('Stato', { enum: ['attivo', 'pausa'] }),
     }, required: ['id'] } },
   { name: 'add_discovery', access: 'interests', write: true,
-    description: "Propone di aggiungere alla lista «da scoprire» di un interesse un libro, podcast, video, documentario, film, articolo, corso, luogo, evento o esperienza. Solo cose reali che conosci con certezza, non già in lista.",
+    description: "Propone di aggiungere alla lista «da scoprire» di un interesse un libro, autore da seguire, podcast, video, canale YouTube, documentario, film, articolo, corso, luogo, evento o esperienza. Solo cose reali che conosci con certezza, non già in lista.",
     parameters: { type: 'object', properties: {
       interest_id: S("Id dell'interesse a cui appartiene"),
       title: S('Titolo esatto'),

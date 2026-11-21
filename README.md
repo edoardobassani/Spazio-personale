@@ -1,4 +1,4 @@
-# Spazio personale — v2.8
+# Spazio personale — v2.8.1
 
 Assistente personale per organizzare impegni, progetti e interessi. È una PWA: si apre dal browser e si installa sulla schermata Home.
 
@@ -32,7 +32,7 @@ Assistente personale per organizzare impegni, progetti e interessi. È una PWA: 
 - Se un progetto è fermo da almeno due settimane, la schermata Oggi può proporre di riprenderlo. Con "Non ora" la proposta sparisce per due settimane. Nessuna serie, nessun punteggio.
 
 **Interessi**
-- Interessi stabili e curiosità del momento. Ogni interesse ha la sua pagina con le note e una lista **da scoprire**: libri, podcast, video, documentari, film, articoli, corsi, luoghi, eventi, esperienze.
+- Interessi stabili e curiosità del momento. Ogni interesse ha la sua pagina con le note e una lista **da scoprire**: libri, autori da seguire, podcast, video, canali YouTube, documentari, film, articoli, corsi, luoghi, eventi, esperienze.
 - **Scopri con Claude** (su ogni interesse, o in cima alla lista per tutti): apre l'assistente su Claude con la richiesta già pronta; le proposte tornano nella lista dell'interesse giusto, segnate come «Claude».
 - Su ogni cosa: segna come fatta e poi *Mi è piaciuto* / *Non fa per me* (Claude ne tiene conto la volta dopo), cerca sul web, metti in agenda, modifica o sposta su un altro interesse.
 - **Trasforma in progetto**: crea un progetto con il nome dell'interesse e un passaggio per ogni cosa da scoprire.

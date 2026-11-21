@@ -1,9 +1,9 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from './store.js?v=2.8.0';
-import * as D from './dates.js?v=2.8.0';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.8.0';
-import { renderFreeTime, renderSaved, recordFeedback } from './learn.js?v=2.8.0';
-import { CLAUDE_URL } from './bridge.js?v=2.8.0';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from './store.js?v=2.8.1';
+import * as D from './dates.js?v=2.8.1';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.8.1';
+import { renderFreeTime, renderSaved, recordFeedback } from './learn.js?v=2.8.1';
+import { CLAUDE_URL } from './bridge.js?v=2.8.1';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false, showDone: false };
 
@@ -750,7 +750,10 @@ export function renderInterests() {
   </section>`;
 }
 
-const searchUrl = x => `https://www.google.com/search?q=${encodeURIComponent([x.title, x.by].filter(Boolean).join(' '))}`;
+const searchUrl = x => {
+  const q = encodeURIComponent([x.title, x.by].filter(Boolean).join(' '));
+  return ['canale', 'video'].includes(x.type) ? `https://www.youtube.com/results?search_query=${q}` : `https://www.google.com/search?q=${q}`;
+};
 const dur = m => !m ? '' : m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : m < 1440 ? `${m / 60} h` : '';
 
 function discoveryRow(i, x, showInterest = false) {
@@ -906,7 +909,7 @@ export function openDiscoverySheet(id, itemId) {
 export function interestToProject(id) {
   const i = state.interests.find(x => x.id === id);
   if (!i) return;
-  const verb = { libro: 'Leggere', podcast: 'Ascoltare', video: 'Guardare', documentario: 'Guardare', film: 'Guardare', articolo: 'Leggere', corso: 'Seguire', luogo: 'Visitare', evento: 'Andare a', esperienza: 'Provare', altro: '' };
+  const verb = { autore: 'Scoprire', canale: 'Seguire', libro: 'Leggere', podcast: 'Ascoltare', video: 'Guardare', documentario: 'Guardare', film: 'Guardare', articolo: 'Leggere', corso: 'Seguire', luogo: 'Visitare', evento: 'Andare a', esperienza: 'Provare', altro: '' };
   openProjectSheet(null, {
     name: i.name, description: i.notes,
     steps: todo(i).slice(0, 8).map(x => ({ text: `${verb[x.type] ? verb[x.type] + ' ' : ''}${x.title}`.trim() })),
@@ -1015,7 +1018,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.8.0</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.8.1</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');

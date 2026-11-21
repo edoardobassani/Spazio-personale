@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.8.0';
+import { todayISO } from './dates.js?v=2.8.1';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -142,7 +142,7 @@ export function normInterest(i = {}) {
 }
 
 export const DISCOVERY_TYPES = {
-  libro: 'Libro', podcast: 'Podcast', video: 'Video', documentario: 'Documentario', film: 'Film', articolo: 'Articolo',
+  libro: 'Libro', autore: 'Autore da seguire', podcast: 'Podcast', video: 'Video', canale: 'Canale YouTube', documentario: 'Documentario', film: 'Film', articolo: 'Articolo',
   corso: 'Corso', luogo: 'Luogo da visitare', evento: 'Evento', esperienza: 'Da provare', altro: 'Altro',
 };
 export function normDiscovery(x = {}) {

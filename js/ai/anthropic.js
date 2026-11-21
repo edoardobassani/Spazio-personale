@@ -1,5 +1,5 @@
 // Adattatore per Claude (Anthropic). Stesse funzioni degli altri adattatori.
-import { AIError } from './gemini.js?v=2.8.0';
+import { AIError } from './gemini.js?v=2.8.1';
 
 const BASE = 'https://api.anthropic.com/v1';
 let seq = 0;
