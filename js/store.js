@@ -1,5 +1,5 @@
 // Archivio dei dati: tutto resta sul dispositivo (localStorage).
-import { todayISO } from './dates.js?v=2.8.1';
+import { todayISO } from './dates.js?v=2.8.2';
 
 export const KEY = 'spazio-personale-v2';
 const OLD_KEY = 'spazio-personale-v1'; // dati della prima versione: non vengono mai cancellati
@@ -141,6 +141,12 @@ export function normInterest(i = {}) {
   };
 }
 
+// Tutte le cose da scoprire di un interesse: le sue e quelle condivise da altri interessi
+export const discoveriesOf = i => [
+  ...i.items.map(x => ({ owner: i, x })),
+  ...state.interests.filter(o => o !== i).flatMap(o => o.items.filter(x => x.also.includes(i.id)).map(x => ({ owner: o, x }))),
+];
+
 export const DISCOVERY_TYPES = {
   libro: 'Libro', autore: 'Autore da seguire', podcast: 'Podcast', video: 'Video', canale: 'Canale YouTube', documentario: 'Documentario', film: 'Film', articolo: 'Articolo',
   corso: 'Corso', luogo: 'Luogo da visitare', evento: 'Evento', esperienza: 'Da provare', altro: 'Altro',
@@ -158,6 +164,8 @@ export function normDiscovery(x = {}) {
     status: x.status === 'fatto' ? 'fatto' : 'da',
     rating: ['piaciuto', 'no'].includes(x.rating) ? x.rating : '',
     from: x.from === 'claude' ? 'claude' : 'tu',
+    // Altri interessi a cui appartiene (per esempio un podcast su più temi)
+    also: [...new Set((Array.isArray(x.also) ? x.also : []).map(str).filter(Boolean))].slice(0, 20),
     createdAt: str(x.createdAt) || nowISO(),
     doneAt: str(x.doneAt),
   };

@@ -1,12 +1,12 @@
 // Ponte con l'assistente su Claude (un artifact su claude.ai).
 // Andata: Spazio copia negli appunti i dati scelti e apre l'assistente.
 // Ritorno: l'assistente copia le proposte; Spazio le legge, le controlla e le fa confermare.
-import { state, commit } from './store.js?v=2.8.1';
-import * as D from './dates.js?v=2.8.1';
-import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.8.1';
-import { items, recLabel, remindersLabel } from './views.js?v=2.8.1';
-import { learnedSummary } from './learn.js?v=2.8.1';
-import { runTool, applyProposal } from './ai/tools.js?v=2.8.1';
+import { state, commit, discoveriesOf } from './store.js?v=2.8.2';
+import * as D from './dates.js?v=2.8.2';
+import { esc, icon, toast, openSheet, closeSheet, voiceSupported } from './ui.js?v=2.8.2';
+import { items, recLabel, remindersLabel } from './views.js?v=2.8.2';
+import { learnedSummary } from './learn.js?v=2.8.2';
+import { runTool, applyProposal } from './ai/tools.js?v=2.8.2';
 
 export const CLAUDE_URL = 'https://claude.ai/artifact/AekZm9tnac6HCS7h1mpjUo';
 const OUT_HEAD = 'SPAZIO>CLAUDE';
@@ -71,10 +71,11 @@ export function buildPackage(request, force = {}) {
   }
   if (o.projects || o.interests) {
     pkg.interessi = state.interests.map(i => {
-      const fatti = i.items.filter(x => x.status === 'fatto').slice(-25);
+      const mine = discoveriesOf(i).map(d => d.x);
+      const fatti = mine.filter(x => x.status === 'fatto').slice(-25);
       return {
         id: i.id, nome: i.name, tipo: i.kind, stato: i.status, note: notes && i.notes ? i.notes : undefined,
-        da_scoprire: i.items.filter(x => x.status === 'da').slice(-40).map(x => `${x.title}${x.by ? ' – ' + x.by : ''} (${x.type})`),
+        da_scoprire: mine.filter(x => x.status === 'da').slice(-40).map(x => `${x.title}${x.by ? ' – ' + x.by : ''} (${x.type})`),
         gia_fatti: fatti.length ? fatti.map(x => `${x.title}${x.by ? ' – ' + x.by : ''}${x.rating === 'piaciuto' ? ': gli è piaciuto' : x.rating === 'no' ? ': non gli è piaciuto' : ''}`) : undefined,
       };
     });

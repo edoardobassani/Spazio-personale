@@ -1,9 +1,9 @@
 // Le schermate dell'app e i pannelli di modifica.
-import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from './store.js?v=2.8.1';
-import * as D from './dates.js?v=2.8.1';
-import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.8.1';
-import { renderFreeTime, renderSaved, recordFeedback } from './learn.js?v=2.8.1';
-import { CLAUDE_URL } from './bridge.js?v=2.8.1';
+import { state, commit, touch, uid, exportData, importData, stats, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES, discoveriesOf } from './store.js?v=2.8.2';
+import * as D from './dates.js?v=2.8.2';
+import { esc, icon, openSheet, closeSheet, toast, voiceSupported } from './ui.js?v=2.8.2';
+import { renderFreeTime, renderSaved, recordFeedback } from './learn.js?v=2.8.2';
+import { CLAUDE_URL } from './bridge.js?v=2.8.2';
 
 export const ui = { mode: 'settimana', cursor: D.todayISO(), selected: D.todayISO(), archive: false, showDone: false };
 
@@ -696,7 +696,7 @@ export function stepDone(id, stepId) {
 
 // ---------- INTERESSI
 
-const todo = i => i.items.filter(x => x.status === 'da');
+const todo = i => discoveriesOf(i).filter(d => d.x.status === 'da');
 
 function interestRow(i) {
   const n = todo(i).length;
@@ -727,7 +727,7 @@ export function renderInterests() {
   const stable = act.filter(i => i.kind === 'stabile');
   const cur = act.filter(i => i.kind === 'curiosita');
   const paused = state.interests.filter(i => i.status === 'pausa');
-  const next = act.flatMap(i => todo(i).map(x => ({ i, x }))).sort((a, b) => b.x.createdAt.localeCompare(a.x.createdAt)).slice(0, 3);
+  const next = act.flatMap(i => i.items.filter(x => x.status === 'da').map(x => ({ i, x }))).sort((a, b) => b.x.createdAt.localeCompare(a.x.createdAt)).slice(0, 3);
   return `<section class="view">
     <header class="page-head"><h1>Interessi</h1></header>
     <form class="add-interest" data-form="interest">
@@ -756,8 +756,11 @@ const searchUrl = x => {
 };
 const dur = m => !m ? '' : m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : m < 1440 ? `${m / 60} h` : '';
 
-function discoveryRow(i, x, showInterest = false) {
-  const meta = [DISCOVERY_TYPES[x.type], x.by, dur(x.minutes), showInterest && i.name].filter(Boolean).map(esc).join(' · ');
+// i = interesse a cui appartiene; page = interesse della pagina aperta (se c'è)
+function discoveryRow(i, x, showInterest = false, page = null) {
+  const names = [i, ...x.also.map(id => state.interests.find(o => o.id === id))].filter(o => o && o !== page).map(o => o.name);
+  const where = showInterest ? names.join(', ') : names.length ? `anche in ${names.join(', ')}` : '';
+  const meta = [DISCOVERY_TYPES[x.type], x.by, dur(x.minutes), where].filter(Boolean).map(esc).join(' · ');
   const btn = (action, ic, label, extra = '') => `<button class="icon-btn tiny" data-action="${action}" data-id="${i.id}" data-item="${x.id}" aria-label="${label}"${extra}>${icon(ic)}</button>`;
   const done = x.status === 'fatto';
   return `<div class="item disc${done ? ' is-done' : ''}${x.from === 'claude' ? ' from-ai' : ''}">
@@ -780,8 +783,9 @@ function discoveryRow(i, x, showInterest = false) {
 export function renderInterest(id) {
   const i = state.interests.find(x => x.id === id);
   if (!i) return `<section class="view"><a class="back" href="#interessi">${icon('left', 'xs')} Interessi</a>${empty('Interesse non trovato.', 'Forse è stato eliminato.')}</section>`;
-  const list = todo(i).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const done = i.items.filter(x => x.status === 'fatto').sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+  const all = discoveriesOf(i);
+  const list = all.filter(d => d.x.status === 'da').sort((a, b) => b.x.createdAt.localeCompare(a.x.createdAt));
+  const done = all.filter(d => d.x.status === 'fatto').sort((a, b) => (b.x.doneAt || '').localeCompare(a.x.doneAt || ''));
   return `<section class="view interest-page">
     <a class="back" href="#interessi">${icon('left', 'xs')} Interessi</a>
     <header class="page-head"><h1>${esc(i.name)}</h1>
@@ -798,9 +802,9 @@ export function renderInterest(id) {
       <button class="icon-btn solid" aria-label="Aggiungi">${icon('plus')}</button>
     </form>
     <h2 class="sec">Da scoprire</h2>
-    ${list.length ? `<div class="list">${list.map(x => discoveryRow(i, x)).join('')}</div>` : empty('La lista è vuota.', 'Aggiungi qualcosa qui sopra o chiedi idee a Claude.')}
+    ${list.length ? `<div class="list">${list.map(d => discoveryRow(d.owner, d.x, false, i)).join('')}</div>` : empty('La lista è vuota.', 'Aggiungi qualcosa qui sopra o chiedi idee a Claude.')}
     ${done.length ? `<button class="sec-toggle" data-action="toggle-done-list">${ui.showDone ? 'Nascondi' : 'Mostra'} già fatti (${done.length})</button>
-      ${ui.showDone ? `<div class="list">${done.map(x => discoveryRow(i, x)).join('')}</div>` : ''}` : ''}
+      ${ui.showDone ? `<div class="list">${done.map(d => discoveryRow(d.owner, d.x, false, i)).join('')}</div>` : ''}` : ''}
   </section>`;
 }
 
@@ -816,7 +820,7 @@ export function addDiscovery(id, title, type) {
   const t = String(title || '').trim();
   if (!i) return false;
   if (!t) { toast('Scrivi cosa vuoi scoprire'); return false; }
-  if (i.items.some(x => x.title.toLowerCase() === t.toLowerCase())) { toast('È già nella lista'); return false; }
+  if (discoveriesOf(i).some(d => d.x.title.toLowerCase() === t.toLowerCase())) { toast('È già nella lista'); return false; }
   i.items.push(normDiscovery({ title: t, type }));
   i.lastTouchedAt = new Date().toISOString();
   commit(); toast('Aggiunto alla lista');
@@ -882,7 +886,10 @@ export function openDiscoverySheet(id, itemId) {
         <label class="field"><span>Collegamento</span><input name="link" type="url" value="${esc(x.link)}" placeholder="https://…" maxlength="500"></label>
         <label class="field"><span>Durata (minuti)</span><input name="minutes" type="number" min="0" inputmode="numeric" value="${x.minutes || ''}"></label>
       </div>
-      <label class="field"><span>Interesse</span><select name="interest">${state.interests.map(o => `<option value="${o.id}"${o.id === i.id ? ' selected' : ''}>${esc(o.name)}</option>`).join('')}</select></label>
+      <fieldset class="field pick-interests"><legend>Interessi <small>(anche più di uno)</small></legend>
+        <div class="pills">${state.interests.map(o => `<label class="pill-check"><input type="checkbox" name="int" value="${o.id}"${o.id === i.id || x.also.includes(o.id) ? ' checked' : ''}><span>${esc(o.name)}</span></label>`).join('')}</div>
+        <small class="err" hidden>Scegli almeno un interesse</small>
+      </fieldset>
       <div class="actions">
         <button type="button" class="btn ghost danger" data-del>Togli</button>
         ${x.status === 'fatto' ? '<button type="button" class="btn ghost" data-undo>Non ancora fatto</button>' : ''}
@@ -896,9 +903,13 @@ export function openDiscoverySheet(id, itemId) {
     fm.addEventListener('submit', e => {
       e.preventDefault();
       if (!fm.what.value.trim()) return;
-      Object.assign(x, normDiscovery({ ...x, title: fm.what.value, type: fm.dtype.value, by: fm.by.value, why: fm.why.value, link: fm.link.value.trim(), minutes: fm.minutes.value }));
-      if (fm.interest.value !== i.id) {
-        const to = state.interests.find(o => o.id === fm.interest.value);
+      const chosen = [...fm.querySelectorAll('[name=int]:checked')].map(c => c.value);
+      if (!chosen.length) { fm.querySelector('.pick-interests .err').hidden = false; return; }
+      // Resta dov'è se l'interesse principale è ancora scelto, altrimenti passa al primo scelto
+      const ownerId = chosen.includes(i.id) ? i.id : chosen[0];
+      Object.assign(x, normDiscovery({ ...x, title: fm.what.value, type: fm.dtype.value, by: fm.by.value, why: fm.why.value, link: fm.link.value.trim(), minutes: fm.minutes.value, also: chosen.filter(c => c !== ownerId) }));
+      if (ownerId !== i.id) {
+        const to = state.interests.find(o => o.id === ownerId);
         if (to) { i.items = i.items.filter(o => o.id !== x.id); to.items.push(x); }
       }
       closeSheet(); commit(); toast('Salvato');
@@ -912,7 +923,7 @@ export function interestToProject(id) {
   const verb = { autore: 'Scoprire', canale: 'Seguire', libro: 'Leggere', podcast: 'Ascoltare', video: 'Guardare', documentario: 'Guardare', film: 'Guardare', articolo: 'Leggere', corso: 'Seguire', luogo: 'Visitare', evento: 'Andare a', esperienza: 'Provare', altro: '' };
   openProjectSheet(null, {
     name: i.name, description: i.notes,
-    steps: todo(i).slice(0, 8).map(x => ({ text: `${verb[x.type] ? verb[x.type] + ' ' : ''}${x.title}`.trim() })),
+    steps: todo(i).slice(0, 8).map(({ x }) => ({ text: `${verb[x.type] ? verb[x.type] + ' ' : ''}${x.title}`.trim() })),
   });
 }
 
@@ -939,8 +950,15 @@ export function openInterestSheet(id) {
     </form>`, sheet => {
     const f = sheet.querySelector('#in-form');
     sheet.querySelector('[data-del]').addEventListener('click', () => {
-      if (!confirm(`Eliminare «${i.name}»${i.items.length ? ' e la sua lista di cose da scoprire' : ''}?`)) return;
+      const own = i.items.filter(x => !x.also.length).length;
+      if (!confirm(`Eliminare «${i.name}»${own ? ' e la sua lista di cose da scoprire' : ''}?`)) return;
       state.interests = state.interests.filter(x => x.id !== i.id);
+      // Le cose condivise con altri interessi non si perdono: passano al primo degli altri
+      for (const x of i.items) {
+        const to = x.also.map(id => state.interests.find(o => o.id === id)).find(Boolean);
+        if (to) { x.also = x.also.filter(id => id !== to.id); to.items.push(x); }
+      }
+      for (const o of state.interests) for (const x of o.items) x.also = x.also.filter(id => id !== i.id);
       closeSheet();
       if (location.hash.startsWith('#interesse/')) location.hash = '#interessi';
       commit(); toast('Interesse eliminato');
@@ -1018,7 +1036,7 @@ export function openSettings(section = '') {
       <button class="btn" data-persist>${icon('shield', 'xs')} Proteggi i dati dalla pulizia automatica</button>
     </div>
     <p class="hint persist-status"></p>
-    <p class="hint version">Spazio personale · versione 2.8.1</p>`, sheet => {
+    <p class="hint version">Spazio personale · versione 2.8.2</p>`, sheet => {
     sheet.querySelectorAll('[data-day]').forEach(el => el.addEventListener('change', () => {
       state.settings.day[el.dataset.day] = el.value;
       commit(); toast('Salvato');
@@ -1120,7 +1138,7 @@ export function searchAll(query) {
     extra: i.notes && words.some(w => foldText(i.notes).includes(w)) ? snippet(i.notes, words) : '',
   }));
   const dc = state.interests.flatMap(i => i.items.filter(x => hit([x.title, x.by, x.why])).map(x => ({
-    kind: 'interest', id: i.id, title: x.title, sub: `${DISCOVERY_TYPES[x.type]}${x.by ? ' · ' + x.by : ''} · ${i.name}${x.status === 'fatto' ? ' · fatto' : ''}`, extra: '',
+    kind: 'interest', id: i.id, title: x.title, sub: `${DISCOVERY_TYPES[x.type]}${x.by ? ' · ' + x.by : ''} · ${[i.name, ...x.also.map(id => (state.interests.find(o => o.id === id) || {}).name).filter(Boolean)].join(', ')}${x.status === 'fatto' ? ' · fatto' : ''}`, extra: '',
   })));
   const sv = state.saved.filter(x => hit([x.title, x.detail])).map(x => ({ kind: 'saved', id: x.id, title: x.title, sub: 'Salvato per dopo', extra: x.detail ? snippet(x.detail, words) : '' }));
   const groups = [['Impegni', ev], ['Progetti', pr], ['Interessi', it], ['Da scoprire', dc], ['Salvati per dopo', sv]].filter(([, l]) => l.length);

@@ -1,11 +1,11 @@
 // Avvio dell'app, navigazione e gestione dei tocchi.
-import { load, onChange } from './store.js?v=2.8.1';
-import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.8.1';
-import { parseQuick } from './parse.js?v=2.8.1';
-import * as V from './views.js?v=2.8.1';
-import * as AI from './ai/assistant.js?v=2.8.1';
-import * as LEARN from './learn.js?v=2.8.1';
-import * as BR from './bridge.js?v=2.8.1';
+import { load, onChange } from './store.js?v=2.8.2';
+import { toast, dictate, stopDictation, isDictating, closeSheet } from './ui.js?v=2.8.2';
+import { parseQuick } from './parse.js?v=2.8.2';
+import * as V from './views.js?v=2.8.2';
+import * as AI from './ai/assistant.js?v=2.8.2';
+import * as LEARN from './learn.js?v=2.8.2';
+import * as BR from './bridge.js?v=2.8.2';
 
 const ROUTES = {
   oggi: V.renderToday,

@@ -1,10 +1,10 @@
 // Strumenti che l'assistente può usare sui dati dell'app.
 // Lettura: eseguita subito, nei limiti dei permessi.
 // Scrittura: diventa una PROPOSTA che l'utente conferma o annulla con un tocco.
-import { state, uid, touch, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES } from '../store.js?v=2.8.1';
-import * as D from '../dates.js?v=2.8.1';
-import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.8.1';
-import { webSearch } from './search.js?v=2.8.1';
+import { state, uid, touch, normEvent, normProject, normInterest, normDiscovery, DISCOVERY_TYPES, discoveriesOf } from '../store.js?v=2.8.2';
+import * as D from '../dates.js?v=2.8.2';
+import { items, TYPE, recLabel, remindersLabel } from '../views.js?v=2.8.2';
+import { webSearch } from './search.js?v=2.8.2';
 
 const isDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 const isTime = v => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
@@ -82,7 +82,8 @@ const DEFS = [
   { name: 'add_discovery', access: 'interests', write: true,
     description: "Propone di aggiungere alla lista «da scoprire» di un interesse un libro, autore da seguire, podcast, video, canale YouTube, documentario, film, articolo, corso, luogo, evento o esperienza. Solo cose reali che conosci con certezza, non già in lista.",
     parameters: { type: 'object', properties: {
-      interest_id: S("Id dell'interesse a cui appartiene"),
+      interest_id: S("Id dell'interesse principale a cui appartiene"),
+      also_interest_ids: { type: 'array', items: { type: 'string' }, description: 'Id di altri interessi esistenti che tocca (per esempio un podcast su più temi), facoltativo' },
       title: S('Titolo esatto'),
       type: S('Tipo', { enum: Object.keys(DISCOVERY_TYPES) }),
       by: S('Autore, regista, conduttore o fonte'),
@@ -273,8 +274,8 @@ const EXEC = {
     return { response: { interessi: state.interests.map(i => ({
       id: i.id, nome: i.name, tipo: i.kind, stato: i.status,
       note: perms.notes && i.notes ? i.notes : undefined,
-      da_scoprire: i.items.filter(x => x.status === 'da').map(x => `${x.title}${x.by ? ' – ' + x.by : ''}`),
-      gia_fatti: i.items.filter(x => x.status === 'fatto').map(x => `${x.title}${x.rating === 'piaciuto' ? ' (piaciuto)' : x.rating === 'no' ? ' (non piaciuto)' : ''}`),
+      da_scoprire: discoveriesOf(i).map(d => d.x).filter(x => x.status === 'da').map(x => `${x.title}${x.by ? ' – ' + x.by : ''}`),
+      gia_fatti: discoveriesOf(i).map(d => d.x).filter(x => x.status === 'fatto').map(x => `${x.title}${x.rating === 'piaciuto' ? ' (piaciuto)' : x.rating === 'no' ? ' (non piaciuto)' : ''}`),
     })) } };
   },
 
@@ -301,11 +302,13 @@ const EXEC = {
   add_discovery(a) {
     const i = findInterest(a.interest_id);
     if (!i) return { response: { errore: "Nessun interesse con questo id. Se è un argomento nuovo, proponi prima add_interest." } };
-    const x = normDiscovery({ ...a, from: 'claude' });
+    const also = (Array.isArray(a.also_interest_ids) ? a.also_interest_ids : []).filter(id => id !== i.id && findInterest(id));
+    const x = normDiscovery({ ...a, also, from: 'claude' });
     if (!x.title) return { response: { errore: 'Manca il titolo' } };
-    if (i.items.some(o => o.title.toLowerCase() === x.title.toLowerCase())) return { response: { errore: 'Già nella lista di questo interesse' } };
-    const args = { interest_id: i.id, title: x.title, type: x.type, by: x.by, why: x.why, minutes: x.minutes, link: x.link };
-    const p = proposal('add_discovery', args, `Da scoprire · ${i.name}`, [
+    if (discoveriesOf(i).some(d => d.x.title.toLowerCase() === x.title.toLowerCase())) return { response: { errore: 'Già nella lista di questo interesse' } };
+    const args = { interest_id: i.id, also_interest_ids: x.also, title: x.title, type: x.type, by: x.by, why: x.why, minutes: x.minutes, link: x.link };
+    const names = [i, ...x.also.map(findInterest)].map(o => o.name).join(', ');
+    const p = proposal('add_discovery', args, `Da scoprire · ${names}`, [
       `«${x.title}»`, [DISCOVERY_TYPES[x.type], x.by, x.minutes ? `${x.minutes} min` : ''].filter(Boolean).join(' · '), x.why,
     ].filter(Boolean));
     return { proposal: p, response: { stato: "in attesa di conferma dell'utente" } };
@@ -366,8 +369,8 @@ export function applyProposal(p) {
     case 'add_discovery': {
       const i = findInterest(a.interest_id);
       if (!i) throw new Error("L'interesse non esiste più");
-      if (i.items.some(o => o.title.toLowerCase() === String(a.title).toLowerCase())) return 'Era già nella lista';
-      i.items.push(normDiscovery({ ...a, from: 'claude' }));
+      if (discoveriesOf(i).some(d => d.x.title.toLowerCase() === String(a.title).toLowerCase())) return 'Era già nella lista';
+      i.items.push(normDiscovery({ ...a, also: (a.also_interest_ids || []).filter(id => id !== i.id && findInterest(id)), from: 'claude' }));
       i.lastTouchedAt = now;
       return 'Aggiunto alla lista da scoprire';
     }
